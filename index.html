@@ -621,6 +621,30 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #hits[hidden]{display:none}
 #list:empty{border-top:none}
 #dataState:empty{display:none}
+/* 行動記録 */
+.recblk .row{display:flex;gap:6px;flex-wrap:wrap}
+.recblk .btn{height:36px;font-size:13px;padding:0 10px}
+.reclist{list-style:none;margin:8px 0 0;padding:0;font-size:13px}
+.reclist li{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed var(--line)}
+.reclist .d{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.reclist .t{flex:1;min-width:0}
+.reclist .ops{display:flex;gap:4px}
+.reclist .ops button{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;font-size:12px;padding:2px 6px;cursor:pointer}
+.recstate{font-size:12px;color:var(--muted)}
+#recForm{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+#recForm[hidden]{display:none}
+#recForm form{background:var(--surface);color:var(--ink);width:min(520px,100%);max-height:92%;overflow-y:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px}
+@media (min-width:861px){#recForm{align-items:center}#recForm form{border-radius:16px}}
+#recForm h3{margin:0;font-size:17px}
+#recForm label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700}
+#recForm input,#recForm select,#recForm textarea{height:42px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 10px;font-size:16px;font-weight:400}
+#recForm textarea{height:64px;padding:8px 10px}
+#recForm .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#recForm .seg{display:flex;gap:6px;flex-wrap:wrap}
+#recForm .seg label{flex-direction:row;align-items:center;gap:6px;font-weight:400;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+#recForm .seg input{height:auto}
+#recForm .acts{display:flex;gap:8px;justify-content:flex-end}
+#recForm .applOnly[hidden]{display:none}
 /* our own date text (the browser's date box showed an empty weekday); the real input sits invisibly on top so a tap opens its picker */
 .datepick{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
 .datepick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
@@ -788,6 +812,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
       <div id="odBox" hidden></div>
       <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
+      <div id="recState" class="recstate"></div>
+      <div class="row"><button class="btn" id="recExport" type="button">記録を書き出す（CSV）</button></div>
+      <div id="recExportBox" hidden class="recstate">
+        <label><input type="checkbox" id="recOnlyNew" checked> 店クラウドVに未入力の分だけ</label>
+        <div class="row"><button class="btn primary" id="recExportGo" type="button">書き出す</button><button class="btn" id="recMarkDone" type="button" disabled>書き出した分を「入力済み」にする</button></div>
+      </div>
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
@@ -831,6 +861,39 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   </main>
 </div>
 <div id="toast" hidden></div>
+<div id="recForm" hidden>
+  <form autocomplete="off">
+    <h3 id="rfTitle">記録をつける</h3>
+    <div id="rfWho" class="recstate"></div>
+    <div class="seg" id="rfKind">
+      <label><input type="radio" name="kind" value="お店誌">お店誌を渡した</label>
+      <label><input type="radio" name="kind" value="訪問">訪問した</label>
+      <label><input type="radio" name="kind" value="所有確認">所有を確認した</label>
+    </div>
+    <div class="two">
+      <label>日付<input type="date" name="date" required></label>
+      <label>担当者<select name="staff"><option>ト</option><option>タ</option><option>テ</option><option>ヤ</option><option>ミ</option></select></label>
+    </div>
+    <div class="applOnly">
+      <div class="two">
+        <label>家電<select name="appl"><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>その他</option></select></label>
+        <label>メーカー<input name="maker" list="rfMakers"></label>
+      </div>
+      <div class="two">
+        <label>型式（品番）<input name="model" autocapitalize="characters"></label>
+        <label>製造年<input name="year" type="number" inputmode="numeric" min="1980" max="2100" placeholder="例 2018"></label>
+      </div>
+      <div class="two">
+        <label>設置場所<input name="place" list="rfPlaces"></label>
+        <label>自店・他店<select name="store"><option value="">－</option><option>自店</option><option>他店</option></select></label>
+      </div>
+    </div>
+    <label>メモ<textarea name="memo"></textarea></label>
+    <div class="acts"><button type="button" class="btn" id="rfCancel">やめる</button><button type="submit" class="btn primary">保存</button></div>
+  </form>
+  <datalist id="rfMakers"><option>パナソニック</option><option>日立</option><option>東芝</option><option>三菱</option><option>シャープ</option><option>象印</option><option>タイガー</option><option>アイリスオーヤマ</option><option>ダイキン</option><option>富士通ゼネラル</option><option>ソニー</option><option>リンナイ</option><option>ノーリツ</option><option>長府</option><option>コロナ</option></datalist>
+  <datalist id="rfPlaces"><option>台所</option><option>キッチン</option><option>居間</option><option>1階</option><option>2階</option><option>離れ</option><option>屋外</option></datalist>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -924,7 +987,7 @@ function bucketOf(y) { return y >= 12 ? '12年以上' : y >= 10 ? '10〜12年' :
 // date set in the panel counts, as does ○ in a カスタム column
 let checkSince = null;
 try { const v = localStorage.getItem('yame-check-since'); if (v) checkSince = new Date(v + 'T00:00:00'); } catch {}
-const checkedOn = a => a.checked || a.disposed || null;
+const checkedOn = a => { const d = a.checked || a.disposed || null; return a.recChecked && (!d || a.recChecked > d) ? a.recChecked : d; };   // recChecked: 所有確認 entered on the map
 const isMaru = a => !!a.maru || (!!checkedOn(a) && (!checkSince || checkedOn(a) >= checkSince));
 function currentAppliance(c, cat) {
   const list = (c.appl[cat] || []).filter(a => a.date || a.over != null);
@@ -1160,8 +1223,9 @@ async function importFiles(files) {
       if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); }
     } catch (e) { bad.push(`${f.name}：${e.message}`); }
   }
-  finalize(); savedAt = new Date(); rebuild(true);
+  applyRecords(); savedAt = new Date(); rebuild(true);
   saveData();
+  recLoad();
   const noXY = [...customers.values()].filter(c => c.lat == null).length;
   let msg = `${files.length}ファイル・${rows.toLocaleString()}行を読み込み、${customers.size.toLocaleString()}人にまとめました。`;
   if (noXY) msg += ` 座標がない ${noXY}人は一覧のみに出ます。`;
@@ -1562,6 +1626,9 @@ function select(code, pan) {
       <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.tels && c.tels.size ? `<div class="empty">電話 ${[...c.tels].map(t => `<a href="tel:${esc(t)}">${esc(t)}</a>`).join('・')}</div>` : ''}${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
+      <div class="blk recblk"><h3>記録をつける</h3>
+        <div class="row"><button class="btn" type="button" data-rec="お店誌">お店誌を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">所有を確認した</button></div>
+        ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
       <div class="blk"><h3>訪問確認（${c.visits.length}件）</h3>${hist(c.visits, 'まだ訪問の記録はありません')}</div>
@@ -1621,7 +1688,7 @@ const OD = {
   client: '297521f9-b9a9-4e0d-8f93-94cde24f8524',   // Entra アプリケーション (クライアント) ID
   tenant: '0029fb64-9a5c-43c7-bf0f-a25b8b248626',   // ディレクトリ (テナント) ID
   redirect: 'https://azviera.github.io/yame-map/',
-  get scope() { return role === 'owner' ? 'openid offline_access Files.ReadWrite.All' : 'openid offline_access Files.Read.All'; },   // only the owner writes (the settings file)
+  scope: 'openid offline_access Files.ReadWrite.All',   // everyone writes their own 行動記録; only the owner's screen can change the settings file
   folder: 'azyame/日計・在庫/店長ABC管理ｔ/Googleマイマップ',
   sharedBase: 'https://azyame-my.sharepoint.com/personal/az-yame_azyame_onmicrosoft_com/Documents/',
 };
@@ -1812,6 +1879,215 @@ async function odFolderChildrenRaw(token) {
     throw new Error(`OneDriveに「${OD.folder}」が見つかりませんでした。共有されているフォルダ：${names || 'なし'}`);
   }
 }
+/* ---------- 行動記録（お店誌・訪問・所有確認）: entered on the map, kept in OneDrive「記録」, exported as CSV ----------
+   Each device appends events to its own file per day (記録/<担当>_<端末>_<日付>.json), so people never overwrite each other.
+   Events: put (add/edit a record), del (remove one), done (records entered into 店クラウドV). Customer data never leaves OneDrive/this device. */
+const REC_DIR = '記録';
+let writerId = lsGet('yame-writer-id');
+if (!writerId) { writerId = Math.random().toString(36).slice(2, 8); lsSet('yame-writer-id', writerId); }
+let recFiles = lsGet('yame-rec-files') || {};      // file name -> { mod, events } (cache of what is on OneDrive)
+let recPending = lsGet('yame-rec-pending') || [];   // events not sent yet
+let recLastExport = [];
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function recAllEvents() {
+  const seen = new Set(), out = [];
+  for (const f of Object.values(recFiles)) for (const e of f.events || []) if (!seen.has(e.id)) { seen.add(e.id); out.push(e); }
+  for (const e of recPending) if (!seen.has(e.id)) { seen.add(e.id); out.push(e); }
+  return out.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+}
+function computeRecords() {
+  const recs = new Map(), done = new Set();
+  for (const e of recAllEvents()) {
+    if (e.op === 'put' && e.rec) recs.set(e.rec.id, e.rec);
+    else if (e.op === 'del') recs.delete(e.recId);
+    else if (e.op === 'done') for (const id of e.ids || []) done.add(id);
+  }
+  return { recs, done };
+}
+// put the records onto the customers (undoing what an earlier pass added first)
+function applyRecords() {
+  for (const c of customers.values()) {
+    c.visits = c.visits.filter(v => !v.fromRec);
+    for (const k in c.appl) { c.appl[k] = c.appl[k].filter(a => !a.fromRec); for (const a of c.appl[k]) delete a.recChecked; }
+    if ('_cat0' in c) { c.catalog = c._cat0; c.catalogTarget = c._ct0; delete c._cat0; delete c._ct0; }
+  }
+  const { recs } = computeRecords();
+  for (const r of [...recs.values()].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+    const c = customers.get(r.code); if (!c) continue;
+    const d = r.date ? new Date(r.date + 'T00:00:00') : null;
+    if (r.kind === '訪問') c.visits.push({ date: d, staff: r.staff, kind: '訪問', custom: '', fromRec: true });
+    else if (r.kind === 'お店誌') {
+      if (!('_cat0' in c)) { c._cat0 = c.catalog; c._ct0 = c.catalogTarget; }
+      c.catalog = r.staff; c.catalogTarget = true;
+    } else if (r.kind === '所有確認') {
+      const cat = r.appl === '熱源' ? 'IH' : r.appl;
+      const list = (c.appl[cat] ||= []);
+      const m = normQ(r.model);
+      const same = m && list.find(a => !a.fromRec && normQ(a.model) === m);
+      if (same) same.recChecked = d;
+      else list.push({ model: r.model || '', date: r.year ? new Date(+r.year, 0, 1) : null, place: r.place || '', checked: d, maru: false, fromRec: true });
+    }
+  }
+  finalize();
+}
+function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
+function recListHTML(code) {
+  const { recs, done } = computeRecords();
+  const list = [...recs.values()].filter(r => r.code === code).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const pend = new Set(recPending.filter(e => e.op === 'put').map(e => e.rec.id));
+  if (!list.length) return '<div class="empty" style="margin-top:6px">この地図からの記録はまだありません</div>';
+  return `<ul class="reclist">${list.map(r => {
+    const what = r.kind === '所有確認' ? `${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
+    const tags = (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
+    const ops = r.writer === writerId ? `<span class="ops"><button type="button" data-redit="${esc(r.id)}">直す</button><button type="button" data-rdel="${esc(r.id)}">消す</button></span>` : '';
+    return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
+  }).join('')}</ul>`;
+}
+function renderRecState() {
+  const n = recPending.length;
+  $('#recState').textContent = n ? `記録の未送信が${n}件あります（インターネットにつながると自動で送ります）` : '';
+}
+function recAdd(ev) {
+  ev.id = newId(); ev.ts = new Date().toISOString(); ev.writer = writerId;
+  recPending.push(ev); lsSet('yame-rec-pending', recPending);
+  recRedraw();
+  recFlush();
+}
+let recFlushing = false;
+async function recFlush() {
+  if (recFlushing || !recPending.length || !odReady() || !navigator.onLine) { renderRecState(); return; }
+  recFlushing = true;
+  try {
+    const sending = recPending.slice();
+    const name = `${squash(lsGet('yame-rec-staff') || 'x')}_${writerId}_${isoDay(new Date()).replace(/-/g, '')}.json`;
+    const r = await odRetry401(async token => {
+      if (!odFolderRef) await odFolderChildren(token);
+      const base = `https://graph.microsoft.com/v1.0/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(REC_DIR)}/${encodeURIComponent(name)}:/content`;
+      let existing = [];
+      const g = await fetch(base, { headers: { Authorization: 'Bearer ' + token } });
+      if (g.ok) existing = await g.json();
+      else if (g.status !== 404) { const e = new Error(`記録の読み込みエラー（${g.status}）`); e.status = g.status; throw e; }
+      const ids = new Set(existing.map(e => e.id));
+      const merged = existing.concat(sending.filter(e => !ids.has(e.id)));
+      const p = await fetch(base, { method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(merged) });
+      if (!p.ok) { const e = new Error(`記録を保存できませんでした（${p.status}）`); e.status = p.status; throw e; }
+      return merged;
+    });
+    if (r.needLogin) { renderRecState(); return; }
+    recFiles[name] = { mod: new Date().toISOString(), events: r.value };
+    lsSet('yame-rec-files', recFiles);
+    const sent = new Set(sending.map(e => e.id));
+    recPending = recPending.filter(e => !sent.has(e.id)); lsSet('yame-rec-pending', recPending);
+    recRedraw();
+  } catch (e) {
+    const t = lsGet('yame-od-tok');
+    if (e.status === 403 && !(t && /ReadWrite/i.test(t.scope || ''))) {
+      toast('記録を保存するには、もう一度サインインが必要です。サインイン画面に移ります', 5000);
+      lsSet('yame-od-pending', 'recflush'); setTimeout(odLogin, 1500);
+    } else if (e.status === 403) toast('「記録」フォルダに書き込む権限がありません。たかのぶさんに「記録」フォルダを「編集可」で共有してもらってください', 9000);
+    else toast(e.message + '（記録はこの端末に残しています）', 6000);
+  } finally { recFlushing = false; renderRecState(); }
+}
+// read everyone's record files (only the ones that changed since last time)
+async function recLoad() {
+  if (!odReady()) return;
+  try {
+    const r = await odRetry401(async token => {
+      if (!odFolderRef) await odFolderChildren(token);
+      let list;
+      try { list = (await graph(`/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(REC_DIR)}:/children?$top=999`, token)).value; }
+      catch (e) { if (e.status === 404) return null; throw e; }
+      let changed = false;
+      const names = new Set();
+      for (const f of list.filter(i => i.file && /\.json$/i.test(i.name))) {
+        names.add(f.name);
+        if (recFiles[f.name] && recFiles[f.name].mod === f.lastModifiedDateTime) continue;
+        const ev = await (await fetch(f['@microsoft.graph.downloadUrl'])).json();
+        recFiles[f.name] = { mod: f.lastModifiedDateTime, events: Array.isArray(ev) ? ev : [] };
+        changed = true;
+      }
+      for (const n of Object.keys(recFiles)) if (!names.has(n)) { delete recFiles[n]; changed = true; }
+      return changed;
+    });
+    if (r.value) { lsSet('yame-rec-files', recFiles); recRedraw(); }
+    recFlush();
+  } catch (e) { /* records are optional; the map still works */ }
+}
+window.addEventListener('online', recFlush);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') recFlush(); });
+
+// the entry form
+let recEditing = null;
+function openRecForm(kind, code, rec) {
+  const c = customers.get(code); if (!c) return;
+  recEditing = { code, id: rec ? rec.id : null };
+  const f = $('#recForm form');
+  f.reset();
+  $('#rfTitle').textContent = rec ? '記録を直す' : '記録をつける';
+  $('#rfWho').textContent = `${c.name || '（名称なし）'}（顧客コード ${c.code}）`;
+  const v = rec || { kind, date: isoDay(new Date()), staff: lsGet('yame-rec-staff') || 'ト' };
+  for (const el of f.elements) {
+    if (!el.name) continue;
+    if (el.type === 'radio') el.checked = el.value === v.kind;
+    else if (v[el.name] != null) el.value = v[el.name];
+  }
+  showApplFields();
+  $('#recForm').hidden = false;
+}
+function showApplFields() { $('#recForm .applOnly').hidden = $('#recForm form').elements.kind.value !== '所有確認'; }
+$('#rfKind').addEventListener('change', showApplFields);
+$('#rfCancel').addEventListener('click', () => { $('#recForm').hidden = true; });
+$('#recForm').addEventListener('click', e => { if (e.target.id === 'recForm') $('#recForm').hidden = true; });
+$('#recForm form').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, c = customers.get(recEditing.code);
+  const kind = f.elements.kind.value;
+  if (!kind) { toast('「お店誌・訪問・所有確認」のどれかを選んでください', 3000); return; }
+  const rec = { id: recEditing.id || newId(), kind, date: f.elements.date.value, staff: f.elements.staff.value, code: c.code, name: c.name,
+    memo: f.elements.memo.value.trim(), writer: writerId, at: new Date().toISOString() };
+  if (kind === '所有確認') Object.assign(rec, { appl: f.elements.appl.value, maker: f.elements.maker.value.trim(), model: f.elements.model.value.trim().normalize('NFKC').toUpperCase(),
+    year: f.elements.year.value, place: f.elements.place.value.trim(), store: f.elements.store.value });
+  lsSet('yame-rec-staff', rec.staff);
+  $('#recForm').hidden = true;
+  recAdd({ op: 'put', rec });
+  toast('記録しました', 2000);
+});
+$('#card').addEventListener('click', e => {
+  const b = e.target.closest('[data-rec],[data-redit],[data-rdel]'); if (!b || !selected) return;
+  if (b.dataset.rec) openRecForm(b.dataset.rec, selected);
+  else if (b.dataset.redit) openRecForm(null, selected, computeRecords().recs.get(b.dataset.redit));
+  else if (b.dataset.rdel && confirm('この記録を消しますか？')) recAdd({ op: 'del', recId: b.dataset.rdel });
+});
+
+// CSV for entering into 店クラウドV (Excel opens it as is)
+$('#recExport').addEventListener('click', () => { $('#recExportBox').hidden = !$('#recExportBox').hidden; });
+$('#recExportGo').addEventListener('click', () => {
+  const { recs, done } = computeRecords();
+  const onlyNew = $('#recOnlyNew').checked;
+  const rows = [...recs.values()].filter(r => !onlyNew || !done.has(r.id))
+    .sort((a, b) => (a.date === b.date ? (a.code < b.code ? -1 : 1) : a.date < b.date ? -1 : 1));
+  if (!rows.length) { toast('書き出す記録がありません', 3000); return; }
+  const head = ['日付', '顧客コード', '顧客名', '担当者', '内容', '家電', 'メーカー', '型式(品番)', '製造年', '設置場所', '自店・他店', '確認日(廃棄日付)', 'メモ', '記録ID', '入力済み'];
+  const q = v => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [head.join(',')].concat(rows.map(r => [r.date.replace(/-/g, '/'), r.code, r.name, r.staff, r.kind, r.appl, r.maker, r.model, r.year, r.place, r.store,
+    r.kind === '所有確認' ? r.date.replace(/-/g, '/') : '', r.memo, r.id, done.has(r.id) ? '済' : ''].map(q).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `行動記録_${isoDay(new Date()).replace(/-/g, '')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  recLastExport = rows.filter(r => !done.has(r.id)).map(r => r.id);
+  $('#recMarkDone').disabled = !recLastExport.length;
+  toast(`${rows.length}件を書き出しました`, 3000);
+});
+$('#recMarkDone').addEventListener('click', () => {
+  if (!recLastExport.length || !confirm(`書き出した${recLastExport.length}件を「入力済み」にしますか？`)) return;
+  recAdd({ op: 'done', ids: recLastExport });
+  recLastExport = []; $('#recMarkDone').disabled = true;
+  toast('入力済みにしました', 2500);
+});
+
 async function odShowList() {
   const box = $('#odBox');
   box.hidden = false; box.textContent = 'OneDriveのフォルダを確認しています…';
@@ -1871,6 +2147,7 @@ $('#odBtn').addEventListener('click', () => {
     const pending = lsGet('yame-od-pending'); lsSet('yame-od-pending', null);
     if (role === 'owner') {
       if (pending === 'savecfg') odSaveSettings();
+      else if (pending === 'recflush') recLoad();
       else if (pending) { openPanelIfPhone(); odShowList(); }
     }
     else odViewerLoad(false);
@@ -1926,7 +2203,7 @@ rebuild(true);
 loadData().then(d => {
   if (d && d.customers instanceof Map && d.customers.size && (isSample || !customers.size)) {
     customers = d.customers; sources = d.sources || []; savedAt = d.savedAt || null; isSample = false;
-    finalize(); rebuild(true);
+    applyRecords(); rebuild(true); recLoad();
     toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
   }
   if (viewerMode() && !backFromLogin) odViewerLoad(true);   // refresh to the latest when already signed in
