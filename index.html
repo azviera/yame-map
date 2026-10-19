@@ -801,6 +801,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="tv">テレビ</option>
           <option value="fridge">冷蔵庫</option>
           <option value="washer">洗濯機</option>
+          <option value="heater">給湯器</option>
           <option value="contact">接点 1・2・3</option>
           <option value="visit">訪問</option>
           <option value="all">拡大時と同じ全部のアイコン</option>
@@ -845,7 +846,7 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 /* ---------- colour dimensions ---------- */
 // CP target thresholds, same as the My Maps layers: 炊飯器 8年 / レンジ 10年 / IH 12年
 // 案内 thresholds (years); 冷蔵庫・洗濯機 follow the CP columns of 【毎日③】, テレビ has none there so 10 is a placeholder
-const TH = { '炊飯器':8, 'レンジ':10, 'IH':12, 'テレビ':10, '冷蔵庫':10, '洗濯機':8 };
+const TH = { '炊飯器':8, 'レンジ':10, 'IH':12, 'テレビ':10, '冷蔵庫':10, '洗濯機':8, '給湯器':15 };
 const OVER = '#3fd8e8', UNDER = '#e3262b';
 const ageOrder = cat => [`${TH[cat]}年以上`, `${TH[cat]}年未満`, '所有なし'];
 const ageCols = cat => ({ [`${TH[cat]}年以上`]:OVER, [`${TH[cat]}年未満`]:UNDER, '所有なし':GREY });
@@ -871,8 +872,8 @@ function staffFromCustom(s) {
   for (let len = 2; len <= Math.min(8, n.length); len++) { const a = STAFF_HASH[fnv(n.slice(0, len))]; if (a) return a; }
   return /店頭/.test(n) ? STORE_STAFF : '';
 }
-const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', fridge:'冷蔵庫', washer:'洗濯機' };
-const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', '冷蔵庫':'冷', '洗濯機':'洗' };
+const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', fridge:'冷蔵庫', washer:'洗濯機', heater:'給湯器' };
+const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', '冷蔵庫':'冷', '洗濯機':'洗', '給湯器':'湯' };
 const DIMS = {
   rfm:   { label:'RFMランク', order:['A','B','C','D','E','-','未設定'],
            colors:{A:'#ffe500',B:'#a6ea5c',C:'#f2a23a',D:'#b9997c',E:'#e8402a','-':'#222222','未設定':'#5fe3f0'}, get:c => c.rfm || '未設定' },
@@ -1293,7 +1294,7 @@ const LABEL_ZOOM = 15;
 const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
   { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
-  { k:'ih', label:'熱源' }, { k:'tv', label:'テレビ' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' },
+  { k:'ih', label:'熱源' }, { k:'tv', label:'テレビ' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' }, { k:'heater', label:'給湯器' },
   { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
 ];
 const show = Object.fromEntries(LOGOS.map(l => [l.k, true]));
@@ -1326,6 +1327,8 @@ function labelHTML(c) {
   // middle row, next to the pin: 訪 then the rank
   if (c.rfm && c.rfm !== '-') { if (show.rfm) row2 += rankMark(c); }
   else if (show.blank) row2 += c.rfm === '-' ? '<i class="lb-dash"></i>' : '<i class="lb-b lb-sora">空</i>';
+  // 給湯器 sits right after the rank
+  if (show.heater) { const a = currentAppliance(c, '給湯器'); if (a) row2 += box('湯', a, '給湯器'); }
   if (show.s && c.rank === 'S') row2 += glyph('S', '#2346f0', 'k');
   let row3 = '';
   if (show.contact) {
@@ -1407,6 +1410,7 @@ function renderLogoToggles() {
     row(box('テ', fresh, 'テレビ') + box('テ', dummy, 'テレビ'), 'テレビ　水色＝10年以上・赤＝10年未満（一番上の段）') +
     row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
     row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
+    row(box('湯', fresh, '給湯器') + box('湯', dummy, '給湯器'), '給湯器　水色＝15年以上・赤＝15年未満（ランクの右隣）') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（下の日付以降に所有を確認）') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
