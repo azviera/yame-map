@@ -1285,7 +1285,8 @@ const storeMarker = L.marker([STORE.lat, STORE.lng], { zIndexOffset: 1000, title
   icon: L.divIcon({ className: 'store-icon', html: '店', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(map)
   .on('click', () => toast('お店（店頭販売の来店客は担当者「ミ」として色分け・絞り込みできます）', 4500));
 
-let dim = 'staff';
+let dim = 'rfm';   // ピンの色分け: RFM by default, the last choice is remembered
+try { const d = localStorage.getItem('yame-dim'); if (d && DIMS[d]) dim = d; } catch {}
 let hidden = {}; for (const k in DIMS) hidden[k] = new Set();
 let query = '';
 let selected = null;
@@ -1577,7 +1578,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#searchWrap')) $('#hits').hidden = true;
 });
 $('#search').addEventListener('focus', renderList);
-$('#dim').addEventListener('change', e => { dim = e.target.value; refresh(); if (selected) select(selected, false); });
+$('#dim').addEventListener('change', e => { dim = e.target.value; try { localStorage.setItem('yame-dim', dim); } catch {} refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
 // 黄色の帯の基準日 (empty = every recorded check counts)
 const showCheckSince = () => {
