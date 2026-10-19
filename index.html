@@ -615,7 +615,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:1000}
 #brand{font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap;display:flex;align-items:center;gap:8px}
 #brand .mark{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);display:inline-block}
-#search{flex:1 1 180px;min-width:0;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 12px}
+#search{width:100%;height:42px;border:1px solid var(--accent);border-radius:8px;background:var(--surface-2);padding:0 12px;font-size:16px}
+#list:empty{border-top:none}
 .colorby{display:flex;align-items:center;gap:6px}
 .colorby label{font-size:12px;color:var(--muted);white-space:nowrap}
 #dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
@@ -734,7 +735,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #app{grid-template-columns:1fr}
   #panelToggle{display:none}
   #brand .txt{display:none}
-  #search{order:3;flex:1 1 100%}
   #dim{max-width:52vw}
   .colorby label{display:none}
   #openPanel{display:inline-block}
@@ -755,14 +755,19 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   <header id="top">
     <button class="btn" id="panelToggle" type="button" aria-controls="panel">◀ 情報を隠す</button>
     <div id="brand"><span class="mark" aria-hidden="true"></span><span class="txt">八女 顧客マップ</span></div>
-    <input id="search" type="search" placeholder="名前・顧客コード・住所で探す" aria-label="顧客を探す">
     <div class="colorby"><label for="dim">ピンの色分け</label>
       <select id="dim"></select></div>
     <button class="btn" id="openPanel" type="button">メニュー</button>
   </header>
 
   <aside id="panel" aria-label="絞り込みと一覧">
-    <div id="panelHead"><b>絞り込み・一覧</b><button class="btn" id="closePanel" type="button">閉じる</button></div>
+    <div id="panelHead"><b>検索・絞り込み</b><button class="btn" id="closePanel" type="button">閉じる</button></div>
+    <div class="sec">
+      <h2>顧客を探す</h2>
+      <input id="search" type="search" placeholder="名前・電話番号の下4桁・顧客番号" aria-label="顧客を探す" autocomplete="off">
+      <ul id="list"></ul>
+      <div class="more" id="listMore"></div>
+    </div>
     <div class="sec">
       <div class="count">地図に表示中 <b id="shown">0</b> / <span id="total">0</span> 件</div>
     </div>
@@ -801,11 +806,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <h2>絞り込み <a id="resetF">すべて表示</a></h2>
       <div id="filters"></div>
     </div>
-    <div class="sec">
-      <h2>一覧</h2>
-      <ul id="list"></ul>
-      <div class="more" id="listMore"></div>
-    </div>
   </aside>
 
   <main id="mapwrap">
@@ -828,7 +828,8 @@ const STORE = { name: 'お店（店頭販売）', lat: 33.2109965, lng: 130.5425
 const TODAY = new Date();
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const normStaff = s => String(s ?? '').replace(/[\s　]+/g, ' ').trim();
+const normQ = s => String(s ?? '').normalize('NFKC').replace(/[\s　\-‐ー−()（）]/g, '').toLowerCase();
+const normStaff =s => String(s ?? '').replace(/[\s　]+/g, ' ').trim();
 const GREY = '#9aa3ab';
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -964,6 +965,11 @@ function ingest(rows, fileName) {
     if (!addr) { const j = String(pick(row, ['結合済み', '住所結合'])); if (/[都道府県市区町村]|\d+-\d+/.test(j)) addr = j; }
     if (addr) c.addr = String(addr).trim();
     const addr2 = pick(row, ['補記住所']); if (addr2) c.addr2 = String(addr2).trim();
+    // phone numbers (any column named 電話 / TEL / 携帯), kept as digits for the 下4桁 search
+    for (const k in row) if (/電話|TEL|携帯/i.test(k)) {
+      const d = String(row[k] ?? '').normalize('NFKC').replace(/\D/g, '');
+      if (d.length >= 4) (c.tels ||= new Set()).add(d);
+    }
     const ll = parseLatLng(row); if (ll) [c.lat, c.lng] = ll;
     const rank = pick(row, ['顧客ランク区分', '顧客ランク']); if (rank) c.rank = String(rank).normalize('NFKC').trim().toUpperCase();
     const rfm = pick(row, ['RFMランク区分', 'RFMランク', 'RFM']); if (rfm) c.rfm = String(rfm).normalize('NFKC').trim().toUpperCase();   // the お店誌 file writes ranks in full-width (Ａ)
@@ -1027,7 +1033,7 @@ function finalize() {
     c.stage = c.events.reduce((best, e) => { const s = stageOf(e.kind); return STAGE_RANK[s] > STAGE_RANK[best] ? s : best; }, '接点なし');
     c.vals = {};
     for (const k in DIMS) c.vals[k] = DIMS[k].get(c);
-    c.search = `${c.name} ${c.code} ${c.addr} ${c.addr2}`.toLowerCase();
+    c.search = normQ(c.name);
   }
 }
 
@@ -1150,6 +1156,7 @@ function makeSample() {
     const lat = a[1] + Math.sin(th) * r, lng = a[2] + Math.cos(th) * r * 1.2;
     const code = String(100 + i * 7 + Math.floor(rnd() * 6));
     const b = { 顧客コード: code, 顧客名称: `${pickR(fam)}　${pickR(giv)}`, 住所: `福岡県八女市${a[0]}${Math.floor(rnd() * 1800) + 1}-${Math.floor(rnd() * 20) + 1}`,
+      電話番号: `0943-${22 + i % 70}-${1000 + (i * 379) % 9000}`,
       補記住所: rnd() < 0.1 ? '裏の倉庫側から' : '', 座標: `${lat.toFixed(7)}, ${lng.toFixed(7)}`,
       顧客ランク区分: rnd() < 0.08 ? 'S' : wpick([['A',25],['B',35],['C',30],['D',10]]),
       RFMランク区分: wpick([['A',18],['B',24],['C',26],['D',18],['E',14],['-',6],['',3]]) };
@@ -1441,13 +1448,18 @@ function renderFilters() {
 function renderDimSelect() {
   $('#dim').innerHTML = Object.keys(DIMS).map(k => `<option value="${k}"${k === dim ? ' selected' : ''}>${esc(DIMS[k].label)}</option>`).join('');
 }
+// customer search: name (spaces ignored), 顧客番号, or the last 4+ digits of a phone number; picking one opens its card on the map
 function renderList() {
-  const list = [...customers.values()].filter(c => passes(c));
-  list.sort((a, b) => (a.name || a.code).localeCompare(b.name || b.code, 'ja'));
-  const max = 300;
-  $('#list').innerHTML = list.slice(0, max).map(c =>
-    `<li data-code="${esc(c.code)}"><span class="dot" style="background:${colorOf(dim, c.vals[dim])}"></span><span class="nm">${esc(c.name || '（名称なし）')}</span><span class="sub">${esc(c.vals[dim])}${c.lat == null ? '・座標なし' : ''}</span></li>`).join('');
-  $('#listMore').textContent = list.length > max ? `ほか ${list.length - max} 件。検索や絞り込みで減らすと全部出ます。` : list.length ? '' : '条件に合う顧客がいません。';
+  const q = normQ($('#search').value);
+  if (!q) { $('#list').innerHTML = ''; $('#listMore').textContent = ''; return; }
+  const digits = /^\d+$/.test(q);
+  const hits = [...customers.values()].filter(c =>
+    c.search.includes(q) || (digits && (c.code.includes(q) || (q.length >= 4 && c.tels && [...c.tels].some(t => t.endsWith(q))))));
+  hits.sort((a, b) => (a.name || a.code).localeCompare(b.name || b.code, 'ja'));
+  const max = 30;
+  $('#list').innerHTML = hits.slice(0, max).map(c =>
+    `<li data-code="${esc(c.code)}"><span class="dot" style="background:${colorOf(dim, c.vals[dim])}"></span><span class="nm">${esc(c.name || '（名称なし）')}</span><span class="sub">${esc(c.code)}${c.lat == null ? '・座標なし' : ''}</span></li>`).join('');
+  $('#listMore').textContent = hits.length > max ? `ほか ${hits.length - max} 人。もう少し詳しく入れてください。` : hits.length ? '' : '見つかりませんでした。';
 }
 function renderDataState() {
   $('#dataState').innerHTML = !isSample && !customers.size
@@ -1481,7 +1493,7 @@ function select(code, pan) {
       <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff || '未接点')}${badge('stage', c.stage)}${badge('visit', c.vals.visit)}</div></div>
       <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
     <div class="bd">
-      <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
+      <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.tels && c.tels.size ? `<div class="empty">電話 ${[...c.tels].map(t => `<a href="tel:${esc(t)}">${esc(t)}</a>`).join('・')}</div>` : ''}${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
       <div class="blk"><h3>調理家電（所有年数）</h3><div class="appl">${applRows}</div></div>
@@ -1510,7 +1522,7 @@ document.addEventListener('click', e => {
   if (li) select(li.dataset.code, true);
 });
 $('#dim').addEventListener('change', e => { dim = e.target.value; refresh(); if (selected) select(selected, false); });
-$('#search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); refresh(); });
+$('#search').addEventListener('input', renderList);
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
 $('#loadBtn').addEventListener('click', () => $('#file').click());
 $('#file').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
