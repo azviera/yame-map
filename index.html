@@ -1396,10 +1396,10 @@ function passes(c, except) {
 }
 function styleFor(c) {
   const sel = selected === c.code;
-  const isS = c.rank === 'S';
+  // every dot of a colour looks the same (S rank is shown by its own icon, not a different ring)
   const k = Math.max(0.45, iconScale());
-  return { radius: (sel ? 11 : isS ? 8.5 : 7) * k, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
-    color: sel ? css('--ink') : isS ? '#b07d00' : css('--pin-stroke'), weight: sel ? 3 : isS ? 3 : 1.5, renderer };
+  return { radius: (sel ? 11 : 7) * k, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
+    color: sel ? css('--ink') : css('--pin-stroke'), weight: sel ? 3 : 1.5, renderer };
 }
 function rebuild(fit) {
   for (const m of markers.values()) map.removeLayer(m);
