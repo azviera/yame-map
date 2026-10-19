@@ -686,7 +686,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .lab{position:relative;width:0;height:0;cursor:pointer;transform:scale(var(--s,1));transform-origin:0 0}
 .lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}.lb-star{position:absolute;left:-8px;top:-8px;width:16px;height:16px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
-.lb-left{position:absolute;right:12px;top:-24px;display:grid;grid-template-rows:16px 16px 16px;justify-items:start}
+.lb-left{position:absolute;right:12px;top:-40px;display:grid;grid-template-rows:16px 16px 16px 16px;justify-items:start}
 .lb-left .r{display:flex;gap:2px;height:16px;align-items:center}
 .lb-b{font-style:normal;font-weight:900;font-size:12px;line-height:14px;height:16px;min-width:16px;padding:0 2px;text-align:center;color:#fff;border-radius:1px;border:1px solid #000;white-space:nowrap}
 .lb-g{font-style:normal;font-weight:900;font-size:15px;line-height:16px;min-width:13px;text-align:center;font-family:"Arial Black","Hiragino Sans","BIZ UDPGothic",sans-serif;paint-order:stroke fill}
@@ -798,6 +798,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="rice">炊飯器</option>
           <option value="range">レンジ</option>
           <option value="ih">IH</option>
+          <option value="tv">テレビ</option>
+          <option value="fridge">冷蔵庫</option>
+          <option value="washer">洗濯機</option>
           <option value="contact">接点 1・2・3</option>
           <option value="visit">訪問</option>
           <option value="all">拡大時と同じ全部のアイコン</option>
@@ -840,7 +843,8 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 
 /* ---------- colour dimensions ---------- */
 // CP target thresholds, same as the My Maps layers: 炊飯器 8年 / レンジ 10年 / IH 12年
-const TH = { '炊飯器':8, 'レンジ':10, 'IH':12 };
+// 案内 thresholds (years); 冷蔵庫・洗濯機 follow the CP columns of 【毎日③】, テレビ has none there so 10 is a placeholder
+const TH = { '炊飯器':8, 'レンジ':10, 'IH':12, 'テレビ':10, '冷蔵庫':10, '洗濯機':8 };
 const OVER = '#3fd8e8', UNDER = '#e3262b';
 const ageOrder = cat => [`${TH[cat]}年以上`, `${TH[cat]}年未満`, '所有なし'];
 const ageCols = cat => ({ [`${TH[cat]}年以上`]:OVER, [`${TH[cat]}年未満`]:UNDER, '所有なし':GREY });
@@ -866,7 +870,8 @@ function staffFromCustom(s) {
   for (let len = 2; len <= Math.min(8, n.length); len++) { const a = STAFF_HASH[fnv(n.slice(0, len))]; if (a) return a; }
   return /店頭/.test(n) ? STORE_STAFF : '';
 }
-const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH' };
+const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', fridge:'冷蔵庫', washer:'洗濯機' };
+const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'IH', 'テレビ':'テ', '冷蔵庫':'冷', '洗濯機':'洗' };
 const DIMS = {
   rfm:   { label:'RFMランク', order:['A','B','C','D','E','-','未設定'],
            colors:{A:'#ffe500',B:'#a6ea5c',C:'#f2a23a',D:'#b9997c',E:'#e8402a','-':'#222222','未設定':'#5fe3f0'}, get:c => c.rfm || '未設定' },
@@ -1278,7 +1283,8 @@ const LABEL_ZOOM = 15;
 const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
   { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
-  { k:'ih', label:'IH' }, { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
+  { k:'ih', label:'IH' }, { k:'tv', label:'テレビ' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' },
+  { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
 ];
 const show = Object.fromEntries(LOGOS.map(l => [l.k, true]));
 try { Object.assign(show, JSON.parse(localStorage.getItem('yame-logos2') || '{}')); } catch {}
@@ -1296,6 +1302,9 @@ function catalogPin(c) {
   return '';                          // not a お店誌 target: no mark
 }
 function labelHTML(c) {
+  const row0 = [['tv','テ','テレビ'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
+    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
+  }).join('');
   const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','IH','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
     const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
   }).join('');
@@ -1318,7 +1327,7 @@ function labelHTML(c) {
   if (show.catalog) pin = catalogPin(c);
   else pin = `<span class="lb-pin" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
-  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
+  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r">${row0}</div><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
 }
 // zoomed out: the coloured pin plus the one logo picked in 広域で出すアイコン
 let wideIcon = 'dot';
@@ -1328,7 +1337,7 @@ function wideHTML(c) {
   let mark = '';
   if (wideIcon === 'rfm') mark = c.rfm && c.rfm !== '-' ? rankMark(c) : '';
   else if (wideIcon === 's') mark = c.rank === 'S' ? glyph('S', '#2346f0', 'k') : '';
-  else if (APPL[wideIcon]) { const cat = APPL[wideIcon], a = currentAppliance(c, cat); mark = a ? box(cat === '炊飯器' ? '炊' : cat === 'レンジ' ? 'レ' : 'IH', a, cat) : ''; }
+  else if (APPL[wideIcon]) { const cat = APPL[wideIcon], a = currentAppliance(c, cat); mark = a ? box(APPL_MARK[cat], a, cat) : ''; }
   else if (wideIcon === 'contact') {
     const seen = new Map();
     for (const e of c.events) { const n = STAGE_NO[stageOf(e.kind)]; if (n && !seen.has(n)) seen.set(n, staffColor(e.staff)); }
@@ -1340,7 +1349,7 @@ function wideHTML(c) {
   const pin = wideIcon === 'catalog'
     ? catalogPin(c)
     : `<span class="lb-pin" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
-  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r"></div><div class="r">${mark}</div><div class="r"></div></div>${pin}</div>`;
+  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r"></div><div class="r"></div><div class="r">${mark}</div><div class="r"></div></div>${pin}</div>`;
 }
 $('#wideSel').value = wideIcon;
 $('#wideSel').addEventListener('change', e => {
@@ -1378,6 +1387,9 @@ function renderLogoToggles() {
     row(box('炊', fresh, '炊飯器') + box('炊', dummy, '炊飯器'), '炊飯器　水色＝8年以上で案内OK・赤＝8年未満で案内NG') +
     row(box('レ', fresh, 'レンジ') + box('レ', dummy, 'レンジ'), 'レンジ　水色＝10年以上で案内OK・赤＝10年未満で案内NG') +
     row(box('IH', fresh, 'IH') + box('IH', dummy, 'IH'), 'IH　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
+    row(box('テ', fresh, 'テレビ') + box('テ', dummy, 'テレビ'), 'テレビ　水色＝10年以上・赤＝10年未満（一番上の段）') +
+    row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
+    row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（下の日付以降に所有を確認）') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
