@@ -801,8 +801,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <button class="btn" id="fitBtn" type="button">全体</button>
       <button class="btn" id="storeBtn" type="button">お店</button>
       <button class="btn" id="meBtn" type="button">現在地</button>
-      <button class="btn" id="zin" type="button" aria-label="拡大">＋</button>
-      <button class="btn" id="zout" type="button" aria-label="縮小">－</button>
       <select class="btn" id="baseSel" aria-label="地図の種類">
         <option value="pale">淡色地図</option>
         <option value="std">標準地図</option>
@@ -1472,8 +1470,6 @@ $('#loadBtn').addEventListener('click', () => $('#file').click());
 $('#file').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
 $('#sampleBtn').addEventListener('click', () => { makeSample(); savedAt = null; clearData(); rebuild(true); toast('見本データに戻しました（覚えていたデータも消しました）'); });
 $('#fitBtn').addEventListener('click', fitAll);
-$('#zin').addEventListener('click', () => map.zoomIn());
-$('#zout').addEventListener('click', () => map.zoomOut());
 $('#storeBtn').addEventListener('click', () => map.setView([STORE.lat, STORE.lng], 16));
 // 現在地: centre once on press, then keep the blue dot following the phone
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
