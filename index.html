@@ -953,7 +953,7 @@ function catOf(prefix) {
   return prefix.replace(/\d+$/, '') || 'その他';
 }
 
-// the all-customer ownership file only adds appliances to customers already on the map
+// the all-customer ownership file (【毎日③】所有azyamedata): base list, coordinates, ranks and appliances
 const isMasterFile = name => /所有azyamedata/i.test(name);
 function ingest(rows, fileName) {
   const visitFile = /訪問/.test(fileName);
@@ -964,7 +964,8 @@ function ingest(rows, fileName) {
     for (const k in raw) row[String(k).replace(/[\s　]/g, '')] = raw[k];
     const code = String(pick(row, ['顧客コード', '顧客CD', '顧客番号'])).trim();
     if (!code) continue;
-    if (enrichOnly && !customers.has(code)) continue;
+    // the ownership file brings everyone except ランク R (the same people ① and Sランク used to bring)
+    if (enrichOnly && !customers.has(code) && String(row['ランク'] ?? '').normalize('NFKC').trim().toUpperCase() === 'R') continue;
     used++;
     let c = customers.get(code);
     if (!c) { c = { code, name:'', addr:'', addr2:'', lat:null, lng:null, rank:'', rfm:'', events:[], visits:[], appl:{}, keys:new Set() }; customers.set(code, c); }
