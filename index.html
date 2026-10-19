@@ -669,11 +669,18 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* house labels (zoomed in): logos left of the pin, name to the right, like the My Maps layers */
 .lab-wrap{background:none;border:none}
 .lab{position:relative;width:0;height:0;cursor:pointer;transform:scale(var(--s,1));transform-origin:0 0}
-.lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}
+/* with a rank letter in the middle, the pin becomes a ring so its colour (お店誌の担当 etc.) stays visible */
+.lab:has(.lb-mid) .lb-pin{left:-14px;top:-14px;width:28px;height:28px;background:#fff;border:6px solid var(--c);box-shadow:0 0 0 1.5px #000}
+.lab:has(.lb-mid) .lb-star{left:-17px;top:-17px;width:34px;height:34px}
+.lab:has(.lb-star) .lb-mid{top:2px}
+.lab:has(.lb-star) .lb-mid .lb-g{color:#000!important;-webkit-text-stroke:0}
+.lab:has(.lb-mid) .lb-left{right:18px}
+.lab:has(.lb-mid) .lb-name{left:18px}
 .lb-star{position:absolute;left:-12px;top:-12px;width:24px;height:24px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
 .lb-mid{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;pointer-events:none}
-.lb-mid .lb-g{font-size:13px;line-height:14px;min-width:0}
+.lb-mid .lb-g{font-size:12px;line-height:13px;min-width:0}
 .lb-left{position:absolute;right:12px;top:-24px;display:grid;grid-template-rows:16px 16px 16px;justify-items:end}
 .lb-left .r{display:flex;gap:2px;height:16px;align-items:center}
 .lb-b{font-style:normal;font-weight:900;font-size:12px;line-height:14px;height:16px;min-width:16px;padding:0 2px;text-align:center;color:#fff;border-radius:1px;border:1px solid #000;white-space:nowrap}
@@ -1246,7 +1253,7 @@ const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b$
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 function catalogPin(c) {
-  if (c.catalog) return `<span class="lb-pin" style="background:${staffColor(c.catalog)}"></span>`;
+  if (c.catalog) return `<span class="lb-pin" style="--c:${staffColor(c.catalog)}"></span>`;
   if (c.catalogTarget) return STAR;   // on the お店誌 list (RFM A) but not sent yet
   return '';                          // not a お店誌 target: no mark
 }
@@ -1273,7 +1280,7 @@ function labelHTML(c) {
   }
   let pin = '';
   if (show.catalog) pin = catalogPin(c);
-  else pin = `<span class="lb-pin" style="background:${colorOf(dim, c.vals[dim])}"></span>`;
+  else pin = `<span class="lb-pin" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
   return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${mid}${name}</div>`;
 }
@@ -1297,7 +1304,7 @@ function wideHTML(c) {
   }
   const pin = wideIcon === 'catalog'
     ? catalogPin(c)
-    : `<span class="lb-pin" style="background:${colorOf(dim, c.vals[dim])}"></span>`;
+    : `<span class="lb-pin" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r"></div><div class="r">${mark}</div><div class="r"></div></div>${pin}${mid}</div>`;
 }
 $('#wideSel').value = wideIcon;
