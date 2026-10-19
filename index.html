@@ -872,7 +872,7 @@ function staffFromCustom(s) {
   return /店頭/.test(n) ? STORE_STAFF : '';
 }
 const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', fridge:'冷蔵庫', washer:'洗濯機' };
-const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'IH', 'テレビ':'テ', '冷蔵庫':'冷', '洗濯機':'洗' };
+const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', '冷蔵庫':'冷', '洗濯機':'洗' };
 const DIMS = {
   rfm:   { label:'RFMランク', order:['A','B','C','D','E','-','未設定'],
            colors:{A:'#ffe500',B:'#a6ea5c',C:'#f2a23a',D:'#b9997c',E:'#e8402a','-':'#222222','未設定':'#5fe3f0'}, get:c => c.rfm || '未設定' },
@@ -1306,7 +1306,7 @@ function labelHTML(c) {
   const row0 = [['tv','テ','テレビ'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
     const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
   }).join('');
-  const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','IH','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
+  const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','熱','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
     const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
   }).join('');
   let row2 = '';
@@ -1394,7 +1394,7 @@ function renderLogoToggles() {
     row(`<span class="kpin" style="background:${st('ト')}"></span><span class="kpin" style="background:${st('タ')}"></span><span class="kpin" style="background:${st('テ')}"></span><span class="kpin" style="background:${st('ヤ')}"></span><span class="kstar">${STAR}</span>`, 'お店誌の担当（★は対象でまだの人・対象外は印なし）') +
     row(box('炊', fresh, '炊飯器') + box('炊', dummy, '炊飯器'), '炊飯器　水色＝8年以上で案内OK・赤＝8年未満で案内NG') +
     row(box('レ', fresh, 'レンジ') + box('レ', dummy, 'レンジ'), 'レンジ　水色＝10年以上で案内OK・赤＝10年未満で案内NG') +
-    row(box('IH', fresh, 'IH') + box('IH', dummy, 'IH'), 'IH　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
+    row(box('熱', fresh, 'IH') + box('熱', dummy, 'IH'), '熱源（IH）　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
     row(box('テ', fresh, 'テレビ') + box('テ', dummy, 'テレビ'), 'テレビ　水色＝10年以上・赤＝10年未満（一番上の段）') +
     row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
     row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
