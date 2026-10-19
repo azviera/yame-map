@@ -621,10 +621,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #hits[hidden]{display:none}
 #list:empty{border-top:none}
 #dataState:empty{display:none}
-.srcbox summary{list-style:none;display:inline-flex;align-items:center;font-size:13px;color:var(--muted)}
-.srcbox summary::-webkit-details-marker{display:none}
-.srcbox #srcInfo{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
-.srcbox #srcInfo ul{margin:4px 0 0;padding-left:18px}
 .colorby{display:flex;align-items:center;gap:6px}
 .colorby label{font-size:12px;color:var(--muted);white-space:nowrap}
 #dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
@@ -807,10 +803,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <h2>絞り込み <a id="resetF">すべて表示</a></h2>
       <div id="filters"></div>
     </div>
-    <details class="sec srcbox">
-      <summary class="btn">読み込んだファイルを見る</summary>
-      <div id="srcInfo"></div>
-    </details>
   </aside>
 
   <main id="mapwrap">
@@ -1473,9 +1465,6 @@ function renderDataState() {
     : isSample
     ? `<span class="sample-tag">見本データ</span> 架空の${customers.size}人を表示中です。実在の顧客ではありません。`
     : '';
-  // which files are in use: tucked away at the bottom of the panel
-  $('#srcInfo').innerHTML = isSample || !customers.size ? 'まだお客様データを読み込んでいません。'
-    : `${savedAt ? `${fmtDate(savedAt)} ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')} に読み込み（この端末に保存中）` : ''}<ul>${sources.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`;
   if (tileFailed) $('#dataState').innerHTML += '<br>背景の地図を読み込めていません。インターネットにつながっているか確認してください。';
 }
 
