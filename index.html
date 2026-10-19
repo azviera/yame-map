@@ -1083,9 +1083,29 @@ async function readFile(file) {
   }
   return arraysToObjects(parseCSV(decodeText(buf))) || [];
 }
+/* ---------- remember the last import on this device (IndexedDB, never leaves the browser) ---------- */
+function idb(mode, fn) {
+  return new Promise((res, rej) => {
+    let rq; try { rq = indexedDB.open('yame-map', 1); } catch (e) { rej(e); return; }
+    rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
+    rq.onerror = () => rej(rq.error);
+    rq.onsuccess = () => {
+      const db = rq.result, tx = db.transaction('kv', mode), r = fn(tx.objectStore('kv'));
+      tx.oncomplete = () => { db.close(); res(r && r.result); };
+      tx.onerror = tx.onabort = () => { db.close(); rej(tx.error); };
+    };
+  });
+}
+const saveData = () => idb('readwrite', s => s.put({ customers, sources, savedAt: new Date() }, 'last')).catch(() => {});
+const loadData = () => idb('readonly', s => s.get('last')).catch(() => null);
+const clearData = () => idb('readwrite', s => s.delete('last')).catch(() => {});
+let savedAt = null;
+let freshNext = true;   // the first import after opening replaces the remembered data instead of adding to it
+
 async function importFiles(files) {
   if (!files.length) return;
-  if (isSample) { customers = new Map(); sources = []; isSample = false; }
+  if (isSample || freshNext) { customers = new Map(); sources = []; isSample = false; }
+  freshNext = false;
   let rows = 0; const bad = [];
   for (const f of files) {
     try {
@@ -1094,7 +1114,8 @@ async function importFiles(files) {
       if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); }
     } catch (e) { bad.push(`${f.name}：${e.message}`); }
   }
-  finalize(); rebuild(true);
+  finalize(); savedAt = new Date(); rebuild(true);
+  saveData();
   const noXY = [...customers.values()].filter(c => c.lat == null).length;
   let msg = `${files.length}ファイル・${rows.toLocaleString()}行を読み込み、${customers.size.toLocaleString()}人にまとめました。`;
   if (noXY) msg += ` 座標がない ${noXY}人は一覧のみに出ます。`;
@@ -1389,7 +1410,7 @@ function renderList() {
 function renderDataState() {
   $('#dataState').innerHTML = isSample
     ? `<span class="sample-tag">見本データ</span> 架空の${customers.size}人を表示中です。実在の顧客ではありません。`
-    : `読み込み済み：${sources.map(esc).join('、')}`;
+    : `${savedAt ? `${fmtDate(savedAt)} ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')} に読み込んだデータ（この端末に保存中）<br>` : ''}読み込み済み：${sources.map(esc).join('、')}`;
   if (tileFailed) $('#dataState').innerHTML += '<br>背景の地図を読み込めていません。インターネットにつながっているか確認するか、地図左上で地図の種類を変えてみてください。';
 }
 
@@ -1449,7 +1470,7 @@ $('#search').addEventListener('input', e => { query = e.target.value.trim().toLo
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
 $('#loadBtn').addEventListener('click', () => $('#file').click());
 $('#file').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
-$('#sampleBtn').addEventListener('click', () => { makeSample(); rebuild(true); toast('見本データに戻しました'); });
+$('#sampleBtn').addEventListener('click', () => { makeSample(); savedAt = null; clearData(); rebuild(true); toast('見本データに戻しました（覚えていたデータも消しました）'); });
 $('#fitBtn').addEventListener('click', fitAll);
 $('#zin').addEventListener('click', () => map.zoomIn());
 $('#zout').addEventListener('click', () => map.zoomOut());
@@ -1488,6 +1509,12 @@ new MutationObserver(refresh).observe(document.documentElement, { attributes: tr
 
 makeSample();
 rebuild(true);
+loadData().then(d => {
+  if (!d || !(d.customers instanceof Map) || !d.customers.size || !isSample) return;
+  customers = d.customers; sources = d.sources || []; savedAt = d.savedAt || null; isSample = false;
+  finalize(); rebuild(true);
+  toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
+});
 })();
 </script>
 
