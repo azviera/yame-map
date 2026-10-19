@@ -783,7 +783,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div class="count">地図に表示中 <b id="shown">0</b> / <span id="total">0</span> 件</div>
     </div>
     <div class="sec datafile">
-      <h2>データ</h2>
+      <h2>データ <a id="reloadApp">アプリを最新にする ↻</a></h2>
       <div id="dataState"></div>
       <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
       <div id="odBox" hidden></div>
@@ -1591,6 +1591,8 @@ document.addEventListener('click', e => {
 $('#search').addEventListener('focus', renderList);
 $('#dim').addEventListener('change', e => { dim = e.target.value; try { localStorage.setItem('yame-dim', dim); } catch {} refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
+// the home-screen app has no browser reload button: reload the page, skipping the cached copy
+$('#reloadApp').addEventListener('click', () => { location.replace(location.pathname + '?v=' + Date.now()); });
 // 黄色の帯の基準日 (empty = every recorded check counts)
 const showCheckSince = () => {
   $('#checkSinceTxt').textContent = checkSince
