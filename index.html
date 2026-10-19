@@ -669,18 +669,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* house labels (zoomed in): logos left of the pin, name to the right, like the My Maps layers */
 .lab-wrap{background:none;border:none}
 .lab{position:relative;width:0;height:0;cursor:pointer;transform:scale(var(--s,1));transform-origin:0 0}
-.lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}
-/* with a rank letter in the middle, the pin becomes a ring so its colour (お店誌の担当 etc.) stays visible */
-.lab:has(.lb-mid) .lb-pin{left:-14px;top:-14px;width:28px;height:28px;background:#fff;border:6px solid var(--c);box-shadow:0 0 0 1.5px #000}
-.lab:has(.lb-mid) .lb-star{left:-17px;top:-17px;width:34px;height:34px}
-.lab:has(.lb-star) .lb-mid{top:2px}
-.lab:has(.lb-star) .lb-mid .lb-g{color:#000!important;-webkit-text-stroke:0}
-.lab:has(.lb-mid) .lb-left{right:18px}
-.lab:has(.lb-mid) .lb-name{left:18px}
-.lb-star{position:absolute;left:-12px;top:-12px;width:24px;height:24px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}.lb-star{position:absolute;left:-12px;top:-12px;width:24px;height:24px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
-.lb-mid{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;pointer-events:none}
-.lb-mid .lb-g{font-size:12px;line-height:13px;min-width:0}
 .lb-left{position:absolute;right:12px;top:-24px;display:grid;grid-template-rows:16px 16px 16px;justify-items:end}
 .lb-left .r{display:flex;gap:2px;height:16px;align-items:center}
 .lb-b{font-style:normal;font-weight:900;font-size:12px;line-height:14px;height:16px;min-width:16px;padding:0 2px;text-align:center;color:#fff;border-radius:1px;border:1px solid #000;white-space:nowrap}
@@ -1266,11 +1256,9 @@ function labelHTML(c) {
     const v = [...c.visits].sort((a, b) => (b.date || 0) - (a.date || 0))[0];
     row2 += glyph(v.staff === STORE_STAFF ? '来' : '訪', staffColor(v.staff), 'w');
   }
-  // the rank mark sits in the middle of the pin
-  let mid = '';
-  if (c.rfm && c.rfm !== '-') { if (show.rfm) mid = rankMark(c); }
-  else if (show.blank) mid = c.rfm === '-' ? '<i class="lb-dash"></i>' : '<i class="lb-b lb-sora">空</i>';
-  if (mid) mid = `<span class="lb-mid">${mid}</span>`;
+  // middle row, next to the pin: 訪 then the rank
+  if (c.rfm && c.rfm !== '-') { if (show.rfm) row2 += rankMark(c); }
+  else if (show.blank) row2 += c.rfm === '-' ? '<i class="lb-dash"></i>' : '<i class="lb-b lb-sora">空</i>';
   if (show.s && c.rank === 'S') row2 += glyph('S', '#2346f0', 'k');
   let row3 = '';
   if (show.contact) {
@@ -1282,7 +1270,7 @@ function labelHTML(c) {
   if (show.catalog) pin = catalogPin(c);
   else pin = `<span class="lb-pin" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
-  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${mid}${name}</div>`;
+  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
 }
 // zoomed out: the coloured pin plus the one logo picked in 広域で出すアイコン
 let wideIcon = 'dot';
@@ -1290,8 +1278,7 @@ try { const w = localStorage.getItem('yame-wide'); if (w && $(`#wideSel option[v
 function wideHTML(c) {
   if (wideIcon === 'all') return labelHTML(c);
   let mark = '';
-  let mid = '';
-  if (wideIcon === 'rfm') mid = c.rfm && c.rfm !== '-' ? `<span class="lb-mid">${rankMark(c)}</span>` : '';
+  if (wideIcon === 'rfm') mark = c.rfm && c.rfm !== '-' ? rankMark(c) : '';
   else if (wideIcon === 's') mark = c.rank === 'S' ? glyph('S', '#2346f0', 'k') : '';
   else if (APPL[wideIcon]) { const cat = APPL[wideIcon], a = currentAppliance(c, cat); mark = a ? box(cat === '炊飯器' ? '炊' : cat === 'レンジ' ? 'レ' : 'IH', a, cat) : ''; }
   else if (wideIcon === 'contact') {
@@ -1305,7 +1292,7 @@ function wideHTML(c) {
   const pin = wideIcon === 'catalog'
     ? catalogPin(c)
     : `<span class="lb-pin" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
-  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r"></div><div class="r">${mark}</div><div class="r"></div></div>${pin}${mid}</div>`;
+  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r"></div><div class="r">${mark}</div><div class="r"></div></div>${pin}</div>`;
 }
 $('#wideSel').value = wideIcon;
 $('#wideSel').addEventListener('change', e => {
