@@ -1524,12 +1524,22 @@ async function odFolderChildren(token) {
   try { return (await graph(`/me/drive/root:/${encPath(OD.folder)}:/children?$top=200`, token)).value; }
   catch (e) {
     if (e.status !== 404) throw e;
-    // the first folder may be a shortcut to a shared folder: follow it into the other drive
-    const [top, ...rest] = OD.folder.split('/');
-    const root = (await graph(`/me/drive/root/children?$top=500`, token)).value.find(i => i.name === top && i.remoteItem);
-    if (!root) throw new Error(`OneDriveに「${OD.folder}」が見つかりませんでした`);
-    const ri = root.remoteItem;
-    return (await graph(`/drives/${ri.parentReference.driveId}/items/${ri.id}:/${encPath(rest.join('/'))}:/children?$top=200`, token)).value;
+    // the folder lives in someone else's OneDrive (shared with me / shortcut): find the shared folder that is part of the path
+    const seg = OD.folder.split('/');
+    const cands = [];
+    const add = list => { for (const i of list || []) { const ri = i.remoteItem || i; if (ri.folder || i.folder) cands.push({ name: i.name || ri.name, id: ri.id, drive: ri.parentReference && ri.parentReference.driveId }); } };
+    try { add((await graph(`/me/drive/root/children?$top=500`, token)).value.filter(i => i.remoteItem)); } catch {}
+    try { add((await graph(`/me/drive/sharedWithMe?allowexternal=true&$top=500`, token)).value); } catch {}
+    for (let k = 0; k < seg.length; k++) {
+      for (const c of cands.filter(c => c.name === seg[k] && c.drive)) {
+        const rest = seg.slice(k + 1).join('/');
+        try {
+          return (await graph(rest ? `/drives/${c.drive}/items/${c.id}:/${encPath(rest)}:/children?$top=200` : `/drives/${c.drive}/items/${c.id}/children?$top=200`, token)).value;
+        } catch {}
+      }
+    }
+    const names = [...new Set(cands.map(c => c.name))].slice(0, 12).join('、');
+    throw new Error(`OneDriveに「${OD.folder}」が見つかりませんでした。共有されているフォルダ：${names || 'なし'}`);
   }
 }
 async function odShowList() {
@@ -1565,8 +1575,8 @@ async function odShowList() {
       } catch (e) { box.textContent = e.message; }
     };
   } catch (e) {
-    box.textContent = e.message + '（もう一度押すとサインインからやり直します）';
-    lsSet('yame-od-tok', null);
+    box.textContent = e.message;
+    if (e.status === 401) { box.textContent += '（もう一度押すとサインインからやり直します）'; lsSet('yame-od-tok', null); }
   }
 }
 $('#odBtn').addEventListener('click', () => {
