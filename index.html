@@ -653,7 +653,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .more{font-size:12px;color:var(--muted);padding-top:6px}
 
 /* map */
-#mapwrap{grid-row:2;position:relative;min-width:0}
+#mapwrap{grid-row:2;grid-column:2;position:relative;min-width:0}
 #map{position:absolute;inset:0;background:var(--map-bg)}
 .leaflet-container{background:var(--map-bg);font-family:var(--f-body)}
 .gridbg{background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:48px 48px}
@@ -663,6 +663,10 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #legend .lt{font-size:12px;font-weight:700;color:var(--muted);align-self:center;white-space:nowrap;padding:0 4px}
 .mapbtns{position:absolute;top:12px;left:12px;z-index:800;display:flex;flex-direction:column;gap:6px}
 .mapbtns .btn{box-shadow:var(--shadow);font-size:13px;height:34px}
+.mapbtns .mebtn{width:44px;height:44px;padding:0;display:grid;place-items:center;background:#fff;border-color:#dadce0;border-radius:8px}
+.mapbtns .mebtn:hover{background:#f1f3f4}
+#app.nopanel{grid-template-columns:0 1fr}
+#app.nopanel #panel{display:none}
 .store-icon{background:var(--ink);color:var(--surface);font-weight:700;font-size:14px;width:30px!important;height:30px!important;border-radius:6px;display:grid;place-items:center;border:2px solid var(--surface);box-shadow:var(--shadow)}
 .ring-label{color:var(--ring);font-size:11px;font-weight:700;white-space:nowrap;background:none;border:none}
 
@@ -728,6 +732,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* phones and small tablets */
 @media (max-width:860px){
   #app{grid-template-columns:1fr}
+  #panelToggle{display:none}
   #brand .txt{display:none}
   #search{order:3;flex:1 1 100%}
   #dim{max-width:52vw}
@@ -748,6 +753,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 <div id="app">
   <header id="top">
+    <button class="btn" id="panelToggle" type="button" aria-controls="panel">◀ 情報を隠す</button>
     <div id="brand"><span class="mark" aria-hidden="true"></span><span class="txt">八女 顧客マップ</span></div>
     <input id="search" type="search" placeholder="名前・顧客コード・住所で探す" aria-label="顧客を探す">
     <div class="colorby"><label for="dim">ピンの色分け</label>
@@ -805,15 +811,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   <main id="mapwrap">
     <div id="map" class="gridbg"></div>
     <div class="mapbtns">
-      <button class="btn" id="fitBtn" type="button">全体</button>
-      <button class="btn" id="storeBtn" type="button">お店</button>
-      <button class="btn" id="meBtn" type="button">現在地</button>
-      <select class="btn" id="baseSel" aria-label="地図の種類">
-        <option value="pale">淡色地図</option>
-        <option value="std">標準地図</option>
-        <option value="photo">航空写真</option>
-        <option value="osm">OpenStreetMap</option>
-      </select>
+      <select class="btn" id="baseSel" aria-label="地図の種類"></select>
+      <button class="btn mebtn" id="meBtn" type="button" aria-label="現在地" title="現在地"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#cfe3fb"/><circle cx="12" cy="12" r="5" fill="#1a73e8"/></svg></button>
     </div>
     <div id="legend" aria-label="凡例（タップで表示・非表示）"></div>
     <section id="card" hidden aria-live="polite"></section>
@@ -1193,15 +1192,17 @@ const BASES = {
 // Google Maps (browser key, restricted to the GitHub Pages address in Google Cloud), loaded only when picked
 const GOOGLE_KEY = location.hostname === 'azviera.github.io' ? 'AIzaSyCEFVYAQvX_6na8z1S1IcYF4UkxF83F-fM' : '';
 const GBASES = { gmap: ['roadmap', 'Googleマップ'], gsat: ['hybrid', 'Google航空写真'] };
+// only the two Google maps are offered; copies that cannot use the key (PC file, Web版) quietly show 地理院の淡色地図
 if (GOOGLE_KEY) for (const k in GBASES) $('#baseSel').insertAdjacentHTML('beforeend', `<option value="${k}">${GBASES[k][1]}</option>`);
+else $('#baseSel').hidden = true;
 const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Googleマップを読み込めませんでした')); document.head.appendChild(s); });
 let googleReady = null;
 const loadGoogle = () => googleReady ||= (async () => {
   if (!(window.google && google.maps)) await loadScript(`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&language=ja&region=JP&v=weekly`);
   await loadScript('https://unpkg.com/leaflet.gridlayer.googlemutant@0.14.1/dist/Leaflet.GoogleMutant.js');
 })().catch(e => { googleReady = null; throw e; });
-let baseKey = 'pale';
-try { const b = localStorage.getItem('yame-base'); if (BASES[b] || (GOOGLE_KEY && GBASES[b])) baseKey = b; } catch {}
+let baseKey = GOOGLE_KEY ? 'gmap' : 'pale';
+try { const b = localStorage.getItem('yame-base'); if (GOOGLE_KEY && GBASES[b]) baseKey = b; } catch {}
 let tiles = null, baseSeq = 0;
 function setBase(k) {
   if (tiles) map.removeLayer(tiles);
@@ -1454,7 +1455,7 @@ function renderDataState() {
     : isSample
     ? `<span class="sample-tag">見本データ</span> 架空の${customers.size}人を表示中です。実在の顧客ではありません。`
     : `${savedAt ? `${fmtDate(savedAt)} ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')} に読み込んだデータ（この端末に保存中）<br>` : ''}読み込み済み：${sources.map(esc).join('、')}`;
-  if (tileFailed) $('#dataState').innerHTML += '<br>背景の地図を読み込めていません。インターネットにつながっているか確認するか、地図左上で地図の種類を変えてみてください。';
+  if (tileFailed) $('#dataState').innerHTML += '<br>背景の地図を読み込めていません。インターネットにつながっているか確認してください。';
 }
 
 /* ---------- customer card ---------- */
@@ -1733,8 +1734,17 @@ $('#odBtn').addEventListener('click', () => {
   } catch (e) { toast(e.message, 8000); }
 })();
 $('#sampleBtn').addEventListener('click', () => { makeSample(); savedAt = null; clearData(); rebuild(true); toast('見本データに戻しました（覚えていたデータも消しました）'); });
-$('#fitBtn').addEventListener('click', fitAll);
-$('#storeBtn').addEventListener('click', () => map.setView([STORE.lat, STORE.lng], 16));
+// PC: hide / show the left panel to give the map the whole width
+function setPanel(open) {
+  $('#app').classList.toggle('nopanel', !open);
+  $('#panelToggle').textContent = open ? '◀ 情報を隠す' : '▶ 情報を表示';
+  try { localStorage.setItem('yame-panel', open ? '1' : '0'); } catch {}
+  setTimeout(() => map.invalidateSize(), 50);
+}
+let panelOpen = true;
+try { panelOpen = localStorage.getItem('yame-panel') !== '0'; } catch {}
+setPanel(panelOpen);
+$('#panelToggle').addEventListener('click', () => { panelOpen = !panelOpen; setPanel(panelOpen); });
 // 現在地: centre once on press, then keep the blue dot following the phone
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
 function showMe(p) {
