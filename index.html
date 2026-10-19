@@ -1483,6 +1483,7 @@ const OD = {
   redirect: 'https://azviera.github.io/yame-map/',
   scope: 'openid offline_access Files.Read.All',
   folder: 'azyame/日計・在庫/店長ABC管理ｔ/Googleマイマップ',
+  sharedBase: 'https://azyame-my.sharepoint.com/personal/az-yame_azyame_onmicrosoft_com/Documents/',
 };
 function openPanelIfPhone() { $('#panel').classList.add('open'); }
 const odReady = () => OD.client && OD.tenant && location.origin + location.pathname === OD.redirect;
@@ -1526,6 +1527,16 @@ async function odFolderChildren(token) {
     if (e.status !== 404) throw e;
     // the folder lives in someone else's OneDrive (shared with me / shortcut): find the shared folder that is part of the path
     const seg = OD.folder.split('/');
+    // the azyame folder is shared from the az-yame account's OneDrive: open it by its web address
+    for (let k = seg.length; k >= 1; k--) {
+      const url = encodeURI(OD.sharedBase + seg.slice(0, k).join('/'));
+      const id = 'u!' + btoa(String.fromCharCode(...new TextEncoder().encode(url))).replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
+      try {
+        const it = await graph(`/shares/${id}/driveItem`, token);
+        const rest = seg.slice(k).join('/'), drive = it.parentReference.driveId;
+        return (await graph(rest ? `/drives/${drive}/items/${it.id}:/${encPath(rest)}:/children?$top=200` : `/drives/${drive}/items/${it.id}/children?$top=200`, token)).value;
+      } catch {}
+    }
     const cands = [];
     const add = list => { for (const i of list || []) { const ri = i.remoteItem || i; if (ri.folder || i.folder) cands.push({ name: i.name || ri.name, id: ri.id, drive: ri.parentReference && ri.parentReference.driveId }); } };
     try { add((await graph(`/me/drive/root/children?$top=500`, token)).value.filter(i => i.remoteItem)); } catch {}
@@ -1538,6 +1549,14 @@ async function odFolderChildren(token) {
         } catch {}
       }
     }
+    // last resort: search the owner's drive for the folder by name
+    try {
+      const host = OD.sharedBase.replace(/^https:\/\/([^/]+)(\/personal\/[^/]+).*$/, '$1:$2');
+      const drv = await graph(`/sites/${host}:/drive?$select=id`, token);
+      const hit = (await graph(`/drives/${drv.id}/root/search(q='${encodeURIComponent(seg[seg.length - 1])}')?$top=50`, token)).value
+        .find(i => i.folder && i.name === seg[seg.length - 1]);
+      if (hit) return (await graph(`/drives/${drv.id}/items/${hit.id}/children?$top=200`, token)).value;
+    } catch {}
     const names = [...new Set(cands.map(c => c.name))].slice(0, 12).join('、');
     throw new Error(`OneDriveに「${OD.folder}」が見つかりませんでした。共有されているフォルダ：${names || 'なし'}`);
   }
