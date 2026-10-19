@@ -807,6 +807,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
         </select></div>
       <div class="widesel"><label for="checkSince">黄色の帯：この日以降に確認したもの</label>
         <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色の帯の基準日"></div></div>
+      <div class="row" style="margin-bottom:8px"><button class="btn" id="logoAll" type="button">すべてチェック</button><button class="btn" id="logoNone" type="button">すべて外す</button></div>
       <div class="chips" id="logoToggles"></div>
       <div class="lkey" id="logoKey"></div>
     </div>
@@ -1373,6 +1374,13 @@ function renderLabels() {
       .on('click', ev => { L.DomEvent.stopPropagation(ev); select(c.code, false); }).addTo(labelLayer);
   }
 }
+function setAllLogos(on) {
+  for (const l of LOGOS) show[l.k] = on;
+  try { localStorage.setItem('yame-logos2', JSON.stringify(show)); } catch {}
+  renderLogoToggles(); renderLabels();
+}
+$('#logoAll').addEventListener('click', () => setAllLogos(true));
+$('#logoNone').addEventListener('click', () => setAllLogos(false));
 function renderLogoToggles() {
   $('#logoToggles').innerHTML = LOGOS.map(l =>
     `<label class="chip logo-chip"><input type="checkbox" id="logo-${l.k}" data-logo="${l.k}"${show[l.k] ? ' checked' : ''}>${esc(l.label)}</label>`).join('');
