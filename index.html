@@ -1557,22 +1557,44 @@ async function odWhoAmI(token) {
   lsSet('yame-role', role);
   applyRole(); renderDataState();
 }
+// a rejected token (password change, sign-out elsewhere, expiry) gets one silent refresh, then a fresh sign-in
+async function odRetry401(fn) {
+  const token = await odToken();
+  if (!token) return { needLogin: true };
+  try { return { value: await fn(token) }; }
+  catch (e) {
+    if (e.status !== 401) throw e;
+    const t = lsGet('yame-od-tok');
+    if (t && t.refresh) {
+      try { const nt = await odTokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh }); return { value: await fn(nt.access) }; }
+      catch (e2) { if (e2.status && e2.status !== 401) throw e2; }
+    }
+    lsSet('yame-od-tok', null);
+    return { needLogin: true };
+  }
+}
 async function odViewerLoad(auto) {
   const btn = $('#viewBtn');
   try {
-    const token = await odToken();
-    if (!token) { if (!auto) { lsSet('yame-od-pending', true); await odLogin(); } return; }
-    if (!role) await odWhoAmI(token);
-    if (role === 'owner') return;
     btn.disabled = true; btn.textContent = '最新のデータを読み込み中…';
-    const files = (await odFolderChildren(token)).filter(isDataFile).filter(f => !DEFAULT_SKIP.test(f.name));
+    const r = await odRetry401(async token => {
+      if (!role) await odWhoAmI(token);
+      if (role === 'owner') return null;
+      return (await odFolderChildren(token)).filter(isDataFile).filter(f => !DEFAULT_SKIP.test(f.name));
+    });
+    if (r.needLogin) {
+      if (auto) toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」を押してサインインし直してください', 8000);
+      else { lsSet('yame-od-pending', true); await odLogin(); }
+      return;
+    }
+    const files = r.value;
+    if (!files) return;
     if (!files.length) throw new Error('共有フォルダにデータが見つかりませんでした');
     const got = await odDownload(files);
     freshNext = true;
     await importFiles(got);
   } catch (e) {
     toast(e.message, 8000);
-    if (e.status === 401) lsSet('yame-od-tok', null);
   } finally { btn.disabled = false; btn.textContent = '最新のお客様データを表示'; }
 }
 $('#viewBtn').addEventListener('click', () => odViewerLoad(false));
@@ -1654,9 +1676,9 @@ async function odShowList() {
   const box = $('#odBox');
   box.hidden = false; box.textContent = 'OneDriveのフォルダを確認しています…';
   try {
-    const token = await odToken();
-    if (!token) { lsSet('yame-od-pending', true); await odLogin(); return; }
-    const files = (await odFolderChildren(token)).filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
+    const r = await odRetry401(token => odFolderChildren(token));
+    if (r.needLogin) { lsSet('yame-od-pending', true); await odLogin(); return; }
+    const files = r.value.filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
     const skip = new Set(lsGet('yame-od-skip') || files.filter(f => /^【|4月1日から/.test(f.name)).map(f => f.name));
