@@ -796,6 +796,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="visit">訪問</option>
           <option value="all">拡大時と同じ全部のアイコン</option>
         </select></div>
+      <div class="widesel"><label for="checkSince">黄色の帯：この日以降に確認したもの</label>
+        <input type="date" id="checkSince" class="btn"></div>
       <div class="chips" id="logoToggles"></div>
       <div class="lkey" id="logoKey"></div>
     </div>
@@ -903,8 +905,14 @@ function fmtAge(d) {
   return `${Math.floor(months / 12)}年${months % 12}か月`;
 }
 function bucketOf(y) { return y >= 12 ? '12年以上' : y >= 10 ? '10〜12年' : y >= 8 ? '8〜10年' : '8年未満'; }
+// 黄色の帯 (seen in person): the 廃棄日付 column holds the date the appliance was checked; a check on or after the
+// date set in the panel counts, as does ○ in a カスタム column
+let checkSince = null;
+try { const v = localStorage.getItem('yame-check-since'); if (v) checkSince = new Date(v + 'T00:00:00'); } catch {}
+const checkedOn = a => a.checked || a.disposed || null;
+const isMaru = a => !!a.maru || (!!checkedOn(a) && (!checkSince || checkedOn(a) >= checkSince));
 function currentAppliance(c, cat) {
-  const list = (c.appl[cat] || []).filter(a => (a.date || a.over != null) && !a.disposed);
+  const list = (c.appl[cat] || []).filter(a => a.date || a.over != null);
   list.sort((a, b) => (b.date || 0) - (a.date || 0));
   return list[0] || null;
 }
@@ -945,14 +953,18 @@ function catOf(prefix) {
   return prefix.replace(/\d+$/, '') || 'その他';
 }
 
+// the all-customer ownership file only adds appliances to customers already on the map
+const isMasterFile = name => /所有azyamedata/i.test(name);
 function ingest(rows, fileName) {
   const visitFile = /訪問/.test(fileName);
+  const enrichOnly = isMasterFile(fileName);
   let used = 0;
   for (const raw of rows) {
     const row = {};
     for (const k in raw) row[String(k).replace(/[\s　]/g, '')] = raw[k];
     const code = String(pick(row, ['顧客コード', '顧客CD', '顧客番号'])).trim();
     if (!code) continue;
+    if (enrichOnly && !customers.has(code)) continue;
     used++;
     let c = customers.get(code);
     if (!c) { c = { code, name:'', addr:'', addr2:'', lat:null, lng:null, rank:'', rfm:'', events:[], visits:[], appl:{}, keys:new Set() }; customers.set(code, c); }
@@ -1004,7 +1016,7 @@ function ingest(rows, fileName) {
       const key = ['a', g.cat, model, fmtDate(d)].join('|');
       if (c.keys.has(key)) continue;
       c.keys.add(key);
-      (c.appl[g.cat] ||= []).push({ model, date: d, place: String(g.place ?? '').trim(), disposed: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
+      (c.appl[g.cat] ||= []).push({ model, date: d, place: String(g.place ?? '').trim(), checked: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
       if (d) dated.add(g.cat);
     }
     // カスタム like "8年以上○": ○ = ownership confirmed by eye; no delivery date needed
@@ -1114,6 +1126,7 @@ async function importFiles(files) {
   if (isSample || freshNext) { customers = new Map(); sources = []; isSample = false; }
   freshNext = false;
   let rows = 0; const bad = [];
+  files = [...files].sort((a, b) => isMasterFile(a.name) - isMasterFile(b.name));   // the ownership file goes last
   for (const f of files) {
     try {
       const objs = await readFile(f);
@@ -1266,7 +1279,7 @@ const STAGE_NO = { 'チラシ':1, '推進':2, '見込み':3 };
 const staffColor = s => STAFF_COL[s] || GREY;
 const STAR = `<svg class="lb-star" viewBox="0 0 24 24"><path d="M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z" fill="#ffe94d" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 const glyph = (t, col, cls = '') => `<i class="lb-g ${cls}" style="color:${col}">${t}</i>`;
-const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${a.maru ? ' maru' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
+const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 function catalogPin(c) {
@@ -1357,7 +1370,7 @@ function renderLogoToggles() {
     row(box('炊', fresh, '炊飯器') + box('炊', dummy, '炊飯器'), '炊飯器　水色＝8年以上で案内OK・赤＝8年未満で案内NG') +
     row(box('レ', fresh, 'レンジ') + box('レ', dummy, 'レンジ'), 'レンジ　水色＝10年以上で案内OK・赤＝10年未満で案内NG') +
     row(box('IH', fresh, 'IH') + box('IH', dummy, 'IH'), 'IH　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
-    row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（所有を目視で確認）') +
+    row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（下の日付以降に所有を確認）') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
@@ -1478,10 +1491,11 @@ function select(code, pan) {
     const a = currentAppliance(c, cat);
     if (!a) return `<span class="k">${esc(cat)}</span><span class="m">所有情報なし</span><span></span>`;
     const b = bucketOf(yearsSince(a.date));
-    const seen = a.maru ? '<br>○ 所有を目視で確認' : '';
+    const seen = checkedOn(a) ? `<br>${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '<br>○ 所有を目視で確認' : '';
     const info = a.date ? `${esc(a.model)}<br>${fmtDate(a.date)} 納品${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
-    return `<span class="k">${esc(cat)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${ageCol(cat, a)};color:${ageCol(cat, a) === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
+    const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
+    return `<span class="k">${esc(cat)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
   }).join('');
   const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
@@ -1494,7 +1508,7 @@ function select(code, pan) {
       <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.tels && c.tels.size ? `<div class="empty">電話 ${[...c.tels].map(t => `<a href="tel:${esc(t)}">${esc(t)}</a>`).join('・')}</div>` : ''}${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
-      <div class="blk"><h3>調理家電（所有年数）</h3><div class="appl">${applRows}</div></div>
+      <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
       <div class="blk"><h3>訪問確認（${c.visits.length}件）</h3>${hist(c.visits, 'まだ訪問の記録はありません')}</div>
     </div>`;
@@ -1523,6 +1537,15 @@ document.addEventListener('click', e => {
 $('#search').addEventListener('focus', renderList);
 $('#dim').addEventListener('change', e => { dim = e.target.value; refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
+// 黄色の帯の基準日 (empty = every recorded check counts)
+if (checkSince) $('#checkSince').value = fmtDate(checkSince).replace(/\//g, '-');
+$('#checkSince').addEventListener('change', e => {
+  const v = e.target.value;
+  checkSince = v ? new Date(v + 'T00:00:00') : null;
+  try { v ? localStorage.setItem('yame-check-since', v) : localStorage.removeItem('yame-check-since'); } catch {}
+  renderLabels(); renderLogoToggles();
+  if (selected) select(selected, false);
+});
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
 
 /* ---------- OneDrive: read the Excel files straight from the Googleマイマップ folder (Microsoft Graph, sign-in with PKCE) ---------- */
@@ -1549,7 +1572,7 @@ function applyRole() {
   $('#viewRow').hidden = !v;
   if (v) $('#odBox').hidden = true;
 }
-const DEFAULT_SKIP = /^【|4月1日から/;
+const DEFAULT_SKIP = /^【(?!毎日)|4月1日から/;   // 【毎日③】所有azyamedata is wanted
 const isDataFile = i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name);
 async function odDownload(list) {
   const got = [];
@@ -1692,7 +1715,7 @@ async function odShowList() {
     const files = r.value.filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
-    const skip = new Set(lsGet('yame-od-skip') || files.filter(f => /^【|4月1日から/.test(f.name)).map(f => f.name));
+    const skip = new Set(lsGet('yame-od-skip') || files.filter(f => DEFAULT_SKIP.test(f.name)).map(f => f.name));
     box.innerHTML = '<b>読み込むファイル</b>' + files.map((f, i) =>
       `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} 更新</span></span></label>`).join('') +
       '<div class="row"><button class="btn primary" id="odGo" type="button">この内容で読み込む</button><button class="btn" id="odClose" type="button">閉じる</button></div>';
