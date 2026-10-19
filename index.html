@@ -800,6 +800,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div class="mapbtns">
       <button class="btn" id="fitBtn" type="button">全体</button>
       <button class="btn" id="storeBtn" type="button">お店</button>
+      <button class="btn" id="meBtn" type="button">現在地</button>
       <button class="btn" id="zin" type="button" aria-label="拡大">＋</button>
       <button class="btn" id="zout" type="button" aria-label="縮小">－</button>
       <select class="btn" id="baseSel" aria-label="地図の種類">
@@ -1453,6 +1454,28 @@ $('#fitBtn').addEventListener('click', fitAll);
 $('#zin').addEventListener('click', () => map.zoomIn());
 $('#zout').addEventListener('click', () => map.zoomOut());
 $('#storeBtn').addEventListener('click', () => map.setView([STORE.lat, STORE.lng], 16));
+// 現在地: centre once on press, then keep the blue dot following the phone
+let meDot = null, meRing = null, meWatch = null, meCentre = false;
+function showMe(p) {
+  const ll = [p.coords.latitude, p.coords.longitude], acc = p.coords.accuracy || 0;
+  if (!meDot) {
+    meRing = L.circle(ll, { radius: acc, color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
+    meDot = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1, interactive: false }).addTo(map);
+  } else { meDot.setLatLng(ll); meRing.setLatLng(ll).setRadius(acc); }
+  if (meCentre) { meCentre = false; map.setView(ll, Math.max(map.getZoom(), 16)); }
+}
+function meError(e) {
+  meCentre = false;
+  toast(e.code === 1 ? '現在地の利用が許可されていません。iPhoneの「設定」→「プライバシーとセキュリティ」→「位置情報サービス」→「Safari」で「使用中のみ」にしてください。'
+    : '現在地を取得できませんでした。電波のよい場所でもう一度押してください。', 7000);
+}
+$('#meBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) { toast('この画面では現在地を使えません。', 4000); return; }
+  meCentre = true;
+  if (meDot) map.setView(meDot.getLatLng(), Math.max(map.getZoom(), 16));
+  if (meWatch == null) meWatch = navigator.geolocation.watchPosition(showMe, meError, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
+  else navigator.geolocation.getCurrentPosition(showMe, meError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+});
 $('#openPanel').addEventListener('click', () => { $('#panel').classList.add('open'); });
 $('#closePanel').addEventListener('click', () => $('#panel').classList.remove('open'));
 map.on('click', () => { if (selected) closeCard(); });
