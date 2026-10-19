@@ -797,7 +797,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="catalog">お店誌の担当（★は対象でまだの人）</option>
           <option value="rice">炊飯器</option>
           <option value="range">レンジ</option>
-          <option value="ih">IH</option>
+          <option value="ih">熱源</option>
           <option value="tv">テレビ</option>
           <option value="fridge">冷蔵庫</option>
           <option value="washer">洗濯機</option>
@@ -882,7 +882,7 @@ const DIMS = {
   catalog:{ label:'お店誌', order:[...STAFF,'お店誌なし'], colors:{...STAFF_COL,'お店誌なし':'#ffe94d'}, get:c => c.catalog || 'お店誌なし' },
   rice:  { label:'炊飯器 所有年数', order:ageOrder('炊飯器'), colors:ageCols('炊飯器'), get:c => ageBucket(c, '炊飯器') },
   range: { label:'レンジ 所有年数', order:ageOrder('レンジ'), colors:ageCols('レンジ'), get:c => ageBucket(c, 'レンジ') },
-  ih:    { label:'IH 所有年数', order:ageOrder('IH'), colors:ageCols('IH'), get:c => ageBucket(c, 'IH') },
+  ih:    { label:'熱源 所有年数', order:ageOrder('IH'), colors:ageCols('IH'), get:c => ageBucket(c, 'IH') },
   stage: { label:'接点段階', order:['見込み','推進','チラシ','その他','接点なし'],
            colors:{'見込み':'#c2362b','推進':'#e07b25','チラシ':'#2f68c8','その他':'#7b5fc0','接点なし':GREY}, get:c => c.stage },
   visit: { label:'訪問確認', order:['訪問済み','未訪問'], colors:{'訪問済み':'#0b6e4f','未訪問':GREY}, get:c => c.visits.length ? '訪問済み' : '未訪問' },
@@ -1293,7 +1293,7 @@ const LABEL_ZOOM = 15;
 const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
   { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
-  { k:'ih', label:'IH' }, { k:'tv', label:'テレビ' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' },
+  { k:'ih', label:'熱源' }, { k:'tv', label:'テレビ' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' },
   { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
 ];
 const show = Object.fromEntries(LOGOS.map(l => [l.k, true]));
@@ -1526,13 +1526,14 @@ function select(code, pan) {
   const badge = (k, txt) => `<span class="badge" style="background:${colorOf(k, c.vals[k])}">${esc(txt)}</span>`;
   const applRows = ['炊飯器', 'レンジ', 'IH'].concat(Object.keys(c.appl).filter(k => !['炊飯器', 'レンジ', 'IH'].includes(k))).map(cat => {
     const a = currentAppliance(c, cat);
-    if (!a) return `<span class="k">${esc(cat)}</span><span class="m">所有情報なし</span><span></span>`;
+    const catName = cat === 'IH' ? '熱源' : cat;
+    if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし</span><span></span>`;
     const b = bucketOf(yearsSince(a.date));
     const seen = checkedOn(a) ? `<br>${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '<br>○ 所有を目視で確認' : '';
     const info = a.date ? `${esc(a.model)}<br>${fmtDate(a.date)} 納品${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
-    return `<span class="k">${esc(cat)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
+    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
   }).join('');
   const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
