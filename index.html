@@ -781,15 +781,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div class="sec datafile">
       <h2>データ</h2>
       <div id="dataState"></div>
-      <div class="row">
-        <button class="btn primary" id="loadBtn" type="button">CSV・Excelを読み込む</button>
-        <button class="btn" id="sampleBtn" type="button">見本に戻す</button>
-      </div>
       <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
       <div id="odBox" hidden></div>
-      <input id="file" type="file" accept=".csv,.xlsx,.xls,.txt" multiple hidden>
       <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
-      <div id="csvNote">店クラウドVのCSVや編集したExcelを何本でも選べます。顧客コードで1人1本のピンにまとめます。ファイルはこの端末の中だけで読み込み、外へ送りません。</div>
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
@@ -1373,8 +1367,7 @@ function renderLogoToggles() {
     row(box('IH', fresh, 'IH') + box('IH', dummy, 'IH'), 'IH　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（所有を目視で確認）') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
-    row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）') +
-    '<div>地図を拡大すると（お店ボタンの倍率くらい）アイコン付きで表示します。</div>';
+    row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
 document.addEventListener('change', e => {
   const k = e.target.dataset?.logo; if (!k) return;
@@ -1542,8 +1535,6 @@ $('#search').addEventListener('focus', renderList);
 $('#dim').addEventListener('change', e => { dim = e.target.value; refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
-$('#loadBtn').addEventListener('click', () => $('#file').click());
-$('#file').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
 
 /* ---------- OneDrive: read the Excel files straight from the Googleマイマップ folder (Microsoft Graph, sign-in with PKCE) ---------- */
 const OD = {
@@ -1565,9 +1556,7 @@ try { role = JSON.parse(localStorage.getItem('yame-role') || 'null'); } catch {}
 const viewerMode = () => odReady() && role !== 'owner';
 function applyRole() {
   const v = viewerMode();
-  $('#loadBtn').parentElement.hidden = v;
   $('#odBtn').parentElement.hidden = v;
-  $('#csvNote').hidden = v;
   $('#viewRow').hidden = !v;
   if (v) $('#odBox').hidden = true;
 }
@@ -1765,7 +1754,6 @@ $('#odBtn').addEventListener('click', () => {
     else odViewerLoad(false);
   } catch (e) { toast(e.message, 8000); }
 })();
-$('#sampleBtn').addEventListener('click', () => { makeSample(); savedAt = null; clearData(); rebuild(true); toast('見本データに戻しました（覚えていたデータも消しました）'); });
 // PC: hide / show the left panel to give the map the whole width
 function setPanel(open) {
   $('#app').classList.toggle('nopanel', !open);
