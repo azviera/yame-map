@@ -1767,7 +1767,7 @@ async function odViewerLoad(auto) {
     });
     if (r.needLogin) {
       if (auto) toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」を押してサインインし直してください', 8000);
-      else if (Date.now() - (lsGet('yame-login-at') || 0) < 120000) toast('サインインはできましたが、データを開けませんでした。少し時間をおいて、もう一度お試しください', 8000);   // never bounce between sign-in and map
+      else if (Date.now() - (lsGet('yame-login-at') || 0) < 120000) toast('サインインはできましたが、データを開けませんでした。少し時間をおいて、もう一度お試しください（' + lastGraphErr + '）', 12000);   // never bounce between sign-in and map
       else { lsSet('yame-od-pending', true); await odLogin(); }
       return;
     }
@@ -1815,9 +1815,10 @@ async function odToken() {   // a usable access token, or null when a fresh sign
   if (t && t.refresh) { try { return (await odTokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh })).access; } catch { lsSet('yame-od-tok', null); } }
   return null;
 }
+let lastGraphErr = '';   // shown when sign-in works but reading fails, so the cause can be told apart
 async function graph(path, token) {
   const r = await fetch(path.startsWith('http') ? path : 'https://graph.microsoft.com/v1.0' + path, { headers: { Authorization: 'Bearer ' + token } });
-  if (!r.ok) { const e = new Error(`OneDriveの応答エラー（${r.status}）`); e.status = r.status; throw e; }
+  if (!r.ok) { lastGraphErr = r.status + ' ' + path.replace(/^https:\/\/[^/]+\/v1\.0/, '').split(/[?:]/)[0].slice(0, 40); const e = new Error(`OneDriveの応答エラー（${r.status}）`); e.status = r.status; throw e; }
   return r.json();
 }
 const encPath = p => p.split('/').map(encodeURIComponent).join('/');
@@ -1858,7 +1859,9 @@ async function odSaveSettings() {
 async function odFolderChildrenRaw(token) {
   try { return (await graph(`/me/drive/root:/${encPath(OD.folder)}:/children?$top=200`, token)).value; }
   catch (e) {
-    if (e.status === 401) throw e;   // guests have no OneDrive of their own, so any other failure means "look in shared folders"
+    // guests have no OneDrive of their own, so a failure here means "look in shared folders";
+    // with the write permission a guest's /me/drive can even answer 401, so only a token that fails /me too is really rejected
+    if (e.status === 401) { try { await graph('/me?$select=id', token); } catch (e2) { throw e2.status === 401 ? e2 : e; } }
     // the folder lives in someone else's OneDrive (shared with me / shortcut): find the shared folder that is part of the path
     const seg = OD.folder.split('/');
     // the azyame folder is shared from the az-yame account's OneDrive: open it by its web address
