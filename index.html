@@ -1576,6 +1576,8 @@ async function odRetry401(fn) {
 }
 async function odViewerLoad(auto) {
   const btn = $('#viewBtn');
+  const hadSignIn = !!lsGet('yame-od-tok');
+  if (auto && !hadSignIn) return;   // never signed in on this device: just wait for the button
   try {
     btn.disabled = true; btn.textContent = '最新のデータを読み込み中…';
     const r = await odRetry401(async token => {
