@@ -1767,6 +1767,7 @@ async function odViewerLoad(auto) {
     });
     if (r.needLogin) {
       if (auto) toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」を押してサインインし直してください', 8000);
+      else if (Date.now() - (lsGet('yame-login-at') || 0) < 120000) toast('サインインはできましたが、データを開けませんでした。少し時間をおいて、もう一度お試しください', 8000);   // never bounce between sign-in and map
       else { lsSet('yame-od-pending', true); await odLogin(); }
       return;
     }
@@ -1789,14 +1790,19 @@ async function odLogin() {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-  lsSet('yame-od-pkce', { verifier, state });
+  lsSet('yame-od-pkce', { verifier, state }); lsSet('yame-login-at', Date.now());
   const q = new URLSearchParams({ client_id: OD.client, response_type: 'code', redirect_uri: OD.redirect, response_mode: 'query',
     scope: OD.scope, state, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account' });
   location.href = `${odAuthBase()}/authorize?${q}`;
 }
+// a refresh asks only for what this device was already given (a read-only sign-in must not fail just because the app now also asks to write)
+function refreshScope(params) {
+  const t = lsGet('yame-od-tok');
+  return params.grant_type === 'refresh_token' && t && /Files\./.test(t.scope || '') ? { scope: 'openid offline_access ' + t.scope.split(' ').filter(x => /^Files\./.test(x)).join(' ') } : {};
+}
 async function odTokenRequest(params) {
   const r = await fetch(`${odAuthBase()}/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: OD.client, redirect_uri: OD.redirect, scope: OD.scope, ...params }) });
+    body: new URLSearchParams({ client_id: OD.client, redirect_uri: OD.redirect, scope: OD.scope, ...params, ...refreshScope(params) }) });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error_description || j.error || 'サインインに失敗しました');
   const tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 120) * 1000, scope: j.scope || '' };
@@ -1962,10 +1968,11 @@ function recAdd(ev) {
   ev.id = newId(); ev.ts = new Date().toISOString(); ev.writer = writerId;
   recPending.push(ev); lsSet('yame-rec-pending', recPending);
   recRedraw();
-  recFlush();
+  recFlush(true);
 }
 let recFlushing = false;
-async function recFlush() {
+// user: the person just pressed 保存 (only then may we send them to the sign-in page, and at most once in 10 minutes)
+async function recFlush(user) {
   if (recFlushing || !recPending.length || !odReady() || !navigator.onLine) { renderRecState(); return; }
   recFlushing = true;
   try {
@@ -1984,7 +1991,7 @@ async function recFlush() {
       if (!p.ok) { const e = new Error(`記録を保存できませんでした（${p.status}）`); e.status = p.status; throw e; }
       return merged;
     });
-    if (r.needLogin) { renderRecState(); return; }
+    if (r.needLogin) { if (user) toast('記録を送るにはサインインが必要です。「最新のお客様データを表示」からサインインしてください（記録はこの端末に残しています）', 7000); renderRecState(); return; }
     recFiles[name] = { mod: new Date().toISOString(), events: r.value };
     lsSet('yame-rec-files', recFiles);
     const sent = new Set(sending.map(e => e.id));
@@ -1993,8 +2000,12 @@ async function recFlush() {
   } catch (e) {
     const t = lsGet('yame-od-tok');
     if (e.status === 403 && !(t && /ReadWrite/i.test(t.scope || ''))) {
-      toast('記録を保存するには、もう一度サインインが必要です。サインイン画面に移ります', 5000);
-      lsSet('yame-od-pending', 'recflush'); setTimeout(odLogin, 1500);
+      const last = lsGet('yame-rec-relogin') || 0;
+      if (user && Date.now() - last > 600000) {
+        lsSet('yame-rec-relogin', Date.now());
+        toast('記録を保存するには、もう一度サインインが必要です。サインイン画面に移ります', 5000);
+        lsSet('yame-od-pending', 'recflush'); setTimeout(odLogin, 1500);
+      } else if (user) toast('書き込みの許可がまだ下りていません（管理者の同意待ち）。記録はこの端末に残しています', 7000);
     } else if (e.status === 403) toast('「記録」フォルダに書き込む権限がありません。たかのぶさんに「記録」フォルダを「編集可」で共有してもらってください', 9000);
     else toast(e.message + '（記録はこの端末に残しています）', 6000);
   } finally { recFlushing = false; renderRecState(); }
