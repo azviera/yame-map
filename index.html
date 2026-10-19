@@ -624,6 +624,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* our own date text (the browser's date box showed an empty weekday); the real input sits invisibly on top so a tap opens its picker */
 .datepick{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
 .datepick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.datepick.ro{border-style:dashed;cursor:default}
+.datepick.ro span[aria-hidden]{display:none}
+.datepick.ro input{display:none}
 .colorby{display:flex;align-items:center;gap:6px}
 .colorby label{font-size:12px;color:var(--muted);white-space:nowrap}
 #dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
@@ -1549,14 +1552,19 @@ const showCheckSince = () => {
 if (checkSince) $('#checkSince').value = fmtDate(checkSince).replace(/\//g, '-');
 showCheckSince();
 $('#checkSince').addEventListener('click', e => { try { e.target.showPicker(); } catch {} });
-$('#checkSince').addEventListener('change', e => {
-  const v = e.target.value;
+function setCheckSince(v, save) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v || '')) v = '';
   checkSince = v ? new Date(v + 'T00:00:00') : null;
+  $('#checkSince').value = v;
   showCheckSince();
   try { v ? localStorage.setItem('yame-check-since', v) : localStorage.removeItem('yame-check-since'); } catch {}
+  lsSet('yame-check-since-str', v);
   renderLabels(); renderLogoToggles();
   if (selected) select(selected, false);
-});
+  if (save) odSaveSettings();
+}
+// only the owner picks the date (saved to OneDrive for everyone); others see it read-only
+$('#checkSince').addEventListener('change', e => setCheckSince(e.target.value, odReady() && role === 'owner'));
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
 
 /* ---------- OneDrive: read the Excel files straight from the Googleマイマップ folder (Microsoft Graph, sign-in with PKCE) ---------- */
@@ -1564,7 +1572,7 @@ const OD = {
   client: '297521f9-b9a9-4e0d-8f93-94cde24f8524',   // Entra アプリケーション (クライアント) ID
   tenant: '0029fb64-9a5c-43c7-bf0f-a25b8b248626',   // ディレクトリ (テナント) ID
   redirect: 'https://azviera.github.io/yame-map/',
-  scope: 'openid offline_access Files.Read.All',
+  get scope() { return role === 'owner' ? 'openid offline_access Files.ReadWrite.All' : 'openid offline_access Files.Read.All'; },   // only the owner writes (the settings file)
   folder: 'azyame/日計・在庫/店長ABC管理ｔ/Googleマイマップ',
   sharedBase: 'https://azyame-my.sharepoint.com/personal/az-yame_azyame_onmicrosoft_com/Documents/',
 };
@@ -1582,6 +1590,8 @@ function applyRole() {
   $('#odBtn').parentElement.hidden = v;
   $('#viewRow').hidden = !v;
   if (v) $('#odBox').hidden = true;
+  $('#checkSince').disabled = v;
+  $('#checkSince').closest('.datepick').classList.toggle('ro', v);
 }
 const DEFAULT_SKIP = /^【(?!毎日)|4月1日から/;   // 【毎日③】所有azyamedata is wanted
 const isDataFile = i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name);
@@ -1625,7 +1635,9 @@ async function odViewerLoad(auto) {
     const r = await odRetry401(async token => {
       if (!role) await odWhoAmI(token);
       if (role === 'owner') return null;
-      return (await odFolderChildren(token)).filter(isDataFile).filter(f => !DEFAULT_SKIP.test(f.name));
+      const list = await odFolderChildren(token);
+      await odReadSettings(list);
+      return list.filter(isDataFile).filter(f => !DEFAULT_SKIP.test(f.name));
     });
     if (r.needLogin) {
       if (auto) toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」を押してサインインし直してください', 8000);
@@ -1661,7 +1673,7 @@ async function odTokenRequest(params) {
     body: new URLSearchParams({ client_id: OD.client, redirect_uri: OD.redirect, scope: OD.scope, ...params }) });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error_description || j.error || 'サインインに失敗しました');
-  const tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 120) * 1000 };
+  const tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 120) * 1000, scope: j.scope || '' };
   lsSet('yame-od-tok', tok);
   return tok;
 }
@@ -1677,7 +1689,41 @@ async function graph(path, token) {
   return r.json();
 }
 const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+// the folder's own address, learnt from the files in it (needed to save the settings file there)
+let odFolderRef = null;
 async function odFolderChildren(token) {
+  const list = await odFolderChildrenRaw(token);
+  const p = list[0] && list[0].parentReference;
+  if (p && p.driveId && p.id) odFolderRef = { drive: p.driveId, id: p.id };
+  return list;
+}
+/* shared settings: the owner's 黄色の帯 date is saved as 地図の設定.json in the folder; everyone reads it */
+const SETTINGS_NAME = '地図の設定.json';
+async function odReadSettings(list) {
+  const f = list.find(i => i.file && i.name === SETTINGS_NAME);
+  if (!f) return;
+  try {
+    const s = await (await fetch(f['@microsoft.graph.downloadUrl'])).json();
+    setCheckSince(s.checkSince || '', false);
+  } catch {}
+}
+async function odSaveSettings() {
+  const v = lsGet('yame-check-since-str') || '';
+  const t = lsGet('yame-od-tok');
+  if (!t || !/ReadWrite/i.test(t.scope || '')) { lsSet('yame-od-pending', 'savecfg'); await odLogin(); return; }   // ask for write permission once
+  try {
+    const r = await odRetry401(async token => {
+      if (!odFolderRef) await odFolderChildren(token);
+      const res = await fetch(`https://graph.microsoft.com/v1.0/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(SETTINGS_NAME)}:/content`, {
+        method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkSince: v, savedAt: new Date().toISOString() }) });
+      if (!res.ok) { const e = new Error(`設定を保存できませんでした（${res.status}）`); e.status = res.status; throw e; }
+    });
+    if (r.needLogin) { lsSet('yame-od-pending', 'savecfg'); await odLogin(); return; }
+    toast('黄色の帯の日付を保存しました。皆さんの画面にも反映されます', 4000);
+  } catch (e) { toast(e.message, 8000); }
+}
+async function odFolderChildrenRaw(token) {
   try { return (await graph(`/me/drive/root:/${encPath(OD.folder)}:/children?$top=200`, token)).value; }
   catch (e) {
     if (e.status === 401) throw e;   // guests have no OneDrive of their own, so any other failure means "look in shared folders"
@@ -1723,6 +1769,7 @@ async function odShowList() {
   try {
     const r = await odRetry401(token => odFolderChildren(token));
     if (r.needLogin) { lsSet('yame-od-pending', true); await odLogin(); return; }
+    await odReadSettings(r.value);
     const files = r.value.filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
@@ -1773,7 +1820,10 @@ $('#odBtn').addEventListener('click', () => {
     const tok = await odTokenRequest({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: p.verifier });
     await odWhoAmI(tok.access);
     const pending = lsGet('yame-od-pending'); lsSet('yame-od-pending', null);
-    if (role === 'owner') { if (pending) { openPanelIfPhone(); odShowList(); } }
+    if (role === 'owner') {
+      if (pending === 'savecfg') odSaveSettings();
+      else if (pending) { openPanelIfPhone(); odShowList(); }
+    }
     else odViewerLoad(false);
   } catch (e) { toast(e.message, 8000); }
 })();
