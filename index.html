@@ -684,6 +684,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* house labels (zoomed in): logos left of the pin, name to the right, like the My Maps layers */
 .lab-wrap{background:none;border:none}
 .lab{position:relative;width:0;height:0;cursor:pointer;transform:scale(var(--s,1));transform-origin:0 0}
+/* invisible, finger-sized tap area around the pin (the pin itself is small once the icons are scaled down) */
+.lab::before{content:"";position:absolute;left:calc(-18px / var(--s,1));top:calc(-18px / var(--s,1));width:calc(36px / var(--s,1));height:calc(36px / var(--s,1));border-radius:50%}
 .lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}.lb-star{position:absolute;left:-8px;top:-8px;width:16px;height:16px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
 .lb-left{position:absolute;right:12px;top:-40px;display:grid;grid-template-rows:16px 16px 16px 16px;justify-items:start}
@@ -1221,7 +1223,7 @@ function makeSample() {
 
 /* ---------- map ---------- */
 const map = L.map('map', { minZoom: 5, zoomControl: false, preferCanvas: true, attributionControl: true }).setView([STORE.lat, STORE.lng], 14);
-const renderer = L.canvas({ tolerance: 8 });
+const renderer = L.canvas({ tolerance: L.Browser.mobile ? 16 : 8 });   // wider tap margin for fingers
 let tileFailed = false;
 const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>';
 const BASES = {
@@ -1373,11 +1375,14 @@ $('#wideSel').addEventListener('change', e => {
 });
 const labelMode = () => map.getZoom() >= LABEL_ZOOM;
 const iconMode = () => labelMode() || wideIcon !== 'dot';
+let renderedArea = null, renderedZoom = null;
 function renderLabels() {
   labelLayer.clearLayers();
+  renderedArea = null;
   if (!iconMode()) return;
   const full = labelMode();
   const b = map.getBounds().pad(full ? 0.25 : 0.1);
+  renderedArea = b; renderedZoom = map.getZoom();
   let n = 0;
   for (const c of customers.values()) {
     if (c.lat == null || !passes(c) || !b.contains([c.lat, c.lng])) continue;
@@ -1427,7 +1432,13 @@ const iconScale = () => { const z = map.getZoom(); return z >= LABEL_ZOOM ? 0.65
 const applyIconScale = () => $('#map').style.setProperty('--s', iconScale());
 applyIconScale();
 map.on('zoomend', () => { applyIconScale(); refresh(); });
-map.on('moveend', () => { if (iconMode()) renderLabels(); });
+// a tap on a phone often nudges the map a little; rebuilding the icons then would swallow the tap,
+// so only rebuild when the view has left the area already drawn
+map.on('moveend', () => {
+  if (!iconMode()) return;
+  if (renderedArea && renderedZoom === map.getZoom() && renderedArea.contains(map.getBounds())) return;
+  renderLabels();
+});
 
 function passes(c, except) {
   if (query && !c.search.includes(query)) return false;
