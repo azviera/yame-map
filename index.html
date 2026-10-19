@@ -1092,9 +1092,17 @@ function arraysToObjects(arr) {
   }
   const head = arr[h].map(v => String(v ?? '').trim());
   if (codeFirst) head[0] = '顧客コード';
-  return arr.slice(h + 1).filter(r => r.some(v => String(v ?? '').trim() !== '')).map(r => {
-    const o = {}; head.forEach((k, i) => { if (k) o[k] = r[i] ?? ''; }); return o;
-  });
+  // keep only the columns the map uses (the ownership file has 233; this makes reading it much faster)
+  const keep = head.map((k, i) => [k.replace(/[\s　]/g, ''), i]).filter(([k]) => k && (
+    /顧客コード|顧客CD|顧客番号|顧客名|氏名|住所|座標|緯度|経度|ランク|RFM|担当|接点|訪問|カスタム|結合|電話|TEL|携帯/i.test(k) ||
+    (/^(.+?)(1?)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付)$/.test(k) && !/サブ\d|[2-9]\d*(品番|納品|設置|廃棄)/.test(k))));
+  const out = [];
+  for (let j = h + 1; j < arr.length; j++) {
+    const r = arr[j];
+    if (!r.some(v => v !== '' && v != null && String(v).trim() !== '')) continue;
+    const o = {}; for (const [k, i] of keep) o[head[i]] = r[i] ?? ''; out.push(o);
+  }
+  return out;
 }
 let xlsxReady = null;
 function loadXLSX() {
@@ -1109,7 +1117,8 @@ async function readFile(file) {
   const buf = await file.arrayBuffer();
   if (/\.xlsx?$/i.test(file.name)) {
     const XLSX = await loadXLSX();
-    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    // first sheet only, no formatted text: about twice as fast on the big files (dates arrive as Excel serial numbers, parseDate handles them)
+    const wb = XLSX.read(buf, { type: 'array', dense: true, sheets: 0, cellText: false, cellHTML: false });
     // only the leftmost sheet is the map data; other sheets are working copies
     const arr = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true });
     return arraysToObjects(arr) || [];
