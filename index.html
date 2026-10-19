@@ -748,7 +748,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <input id="search" type="search" placeholder="名前・顧客コード・住所で探す" aria-label="顧客を探す">
     <div class="colorby"><label for="dim">ピンの色分け</label>
       <select id="dim"></select></div>
-    <button class="btn" id="openPanel" type="button">絞り込み</button>
+    <button class="btn" id="openPanel" type="button">メニュー</button>
   </header>
 
   <aside id="panel" aria-label="絞り込みと一覧">
@@ -1346,7 +1346,7 @@ function refresh() {
   const sel = selected && markers.get(selected); if (sel && map.hasLayer(sel)) sel.bringToFront();
   $('#shown').textContent = shown.toLocaleString();
   $('#total').textContent = customers.size.toLocaleString();
-  $('#openPanel').textContent = `一覧 ${shown}`;
+  $('#openPanel').textContent = 'メニュー';
   renderLegend(); renderFilters(); renderList();
 }
 function fitAll() {
