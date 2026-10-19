@@ -621,6 +621,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #hits[hidden]{display:none}
 #list:empty{border-top:none}
 #dataState:empty{display:none}
+/* our own date text (the browser's date box showed an empty weekday); the real input sits invisibly on top so a tap opens its picker */
+.datepick{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
+.datepick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
 .colorby{display:flex;align-items:center;gap:6px}
 .colorby label{font-size:12px;color:var(--muted);white-space:nowrap}
 #dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
@@ -797,7 +800,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="all">拡大時と同じ全部のアイコン</option>
         </select></div>
       <div class="widesel"><label for="checkSince">黄色の帯：この日以降に確認したもの</label>
-        <input type="date" id="checkSince" class="btn"></div>
+        <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色の帯の基準日"></div></div>
       <div class="chips" id="logoToggles"></div>
       <div class="lkey" id="logoKey"></div>
     </div>
@@ -1539,10 +1542,17 @@ $('#search').addEventListener('focus', renderList);
 $('#dim').addEventListener('change', e => { dim = e.target.value; refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
 // 黄色の帯の基準日 (empty = every recorded check counts)
+const showCheckSince = () => {
+  $('#checkSinceTxt').textContent = checkSince
+    ? `${fmtDate(checkSince)}（${'日月火水木金土'[checkSince.getDay()]}）以降` : '指定なし（確認日があれば全部）';
+};
 if (checkSince) $('#checkSince').value = fmtDate(checkSince).replace(/\//g, '-');
+showCheckSince();
+$('#checkSince').addEventListener('click', e => { try { e.target.showPicker(); } catch {} });
 $('#checkSince').addEventListener('change', e => {
   const v = e.target.value;
   checkSince = v ? new Date(v + 'T00:00:00') : null;
+  showCheckSince();
   try { v ? localStorage.setItem('yame-check-since', v) : localStorage.removeItem('yame-check-since'); } catch {}
   renderLabels(); renderLogoToggles();
   if (selected) select(selected, false);
