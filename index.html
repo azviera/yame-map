@@ -692,6 +692,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .widesel{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:13px;font-weight:700}
 .widesel select{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
 .logo-chip{display:inline-flex;align-items:center;gap:6px}
+#odBox{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px;color:var(--ink)}
+#odBox[hidden]{display:none}
+#odBox label{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.4}
+#odBox input{width:18px;height:18px;margin:1px 0 0;flex:none}
+#odBox .d{color:var(--muted);font-size:11px;white-space:nowrap}
 .logo-chip input{width:18px;height:18px;margin:0}
 .lkey{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;margin-top:10px}
 
@@ -763,6 +768,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
         <button class="btn primary" id="loadBtn" type="button">CSV・Excelを読み込む</button>
         <button class="btn" id="sampleBtn" type="button">見本に戻す</button>
       </div>
+      <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
+      <div id="odBox" hidden></div>
       <input id="file" type="file" accept=".csv,.xlsx,.xls,.txt" multiple hidden>
       <div>店クラウドVのCSVや編集したExcelを何本でも選べます。顧客コードで1人1本のピンにまとめます。ファイルはこの端末の中だけで読み込み、外へ送りません。</div>
     </div>
@@ -1468,6 +1475,120 @@ $('#search').addEventListener('input', e => { query = e.target.value.trim().toLo
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
 $('#loadBtn').addEventListener('click', () => $('#file').click());
 $('#file').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
+
+/* ---------- OneDrive: read the Excel files straight from the Googleマイマップ folder (Microsoft Graph, sign-in with PKCE) ---------- */
+const OD = {
+  client: '297521f9-b9a9-4e0d-8f93-94cde24f8524',   // Entra アプリケーション (クライアント) ID
+  tenant: '0029fb64-9a5c-43c7-bf0f-a25b8b248626',   // ディレクトリ (テナント) ID
+  redirect: 'https://azviera.github.io/yame-map/',
+  scope: 'openid offline_access Files.Read.All',
+  folder: 'azyame/日計・在庫/店長ABC管理ｔ/Googleマイマップ',
+};
+function openPanelIfPhone() { $('#panel').classList.add('open'); }
+const odReady = () => OD.client && OD.tenant && location.origin + location.pathname === OD.redirect;
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
+const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const odAuthBase = () => `https://login.microsoftonline.com/${OD.tenant}/oauth2/v2.0`;
+async function odLogin() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  lsSet('yame-od-pkce', { verifier, state });
+  const q = new URLSearchParams({ client_id: OD.client, response_type: 'code', redirect_uri: OD.redirect, response_mode: 'query',
+    scope: OD.scope, state, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account' });
+  location.href = `${odAuthBase()}/authorize?${q}`;
+}
+async function odTokenRequest(params) {
+  const r = await fetch(`${odAuthBase()}/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: OD.client, redirect_uri: OD.redirect, scope: OD.scope, ...params }) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error_description || j.error || 'サインインに失敗しました');
+  const tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 120) * 1000 };
+  lsSet('yame-od-tok', tok);
+  return tok;
+}
+async function odToken() {   // a usable access token, or null when a fresh sign-in is needed
+  const t = lsGet('yame-od-tok');
+  if (t && t.exp > Date.now()) return t.access;
+  if (t && t.refresh) { try { return (await odTokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh })).access; } catch { lsSet('yame-od-tok', null); } }
+  return null;
+}
+async function graph(path, token) {
+  const r = await fetch(path.startsWith('http') ? path : 'https://graph.microsoft.com/v1.0' + path, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) { const e = new Error(`OneDriveの応答エラー（${r.status}）`); e.status = r.status; throw e; }
+  return r.json();
+}
+const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+async function odFolderChildren(token) {
+  try { return (await graph(`/me/drive/root:/${encPath(OD.folder)}:/children?$top=200`, token)).value; }
+  catch (e) {
+    if (e.status !== 404) throw e;
+    // the first folder may be a shortcut to a shared folder: follow it into the other drive
+    const [top, ...rest] = OD.folder.split('/');
+    const root = (await graph(`/me/drive/root/children?$top=500`, token)).value.find(i => i.name === top && i.remoteItem);
+    if (!root) throw new Error(`OneDriveに「${OD.folder}」が見つかりませんでした`);
+    const ri = root.remoteItem;
+    return (await graph(`/drives/${ri.parentReference.driveId}/items/${ri.id}:/${encPath(rest.join('/'))}:/children?$top=200`, token)).value;
+  }
+}
+async function odShowList() {
+  const box = $('#odBox');
+  box.hidden = false; box.textContent = 'OneDriveのフォルダを確認しています…';
+  try {
+    const token = await odToken();
+    if (!token) { lsSet('yame-od-pending', true); await odLogin(); return; }
+    const files = (await odFolderChildren(token)).filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
+    const skip = new Set(lsGet('yame-od-skip') || files.filter(f => /^【|4月1日から/.test(f.name)).map(f => f.name));
+    box.innerHTML = '<b>読み込むファイル</b>' + files.map((f, i) =>
+      `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} 更新</span></span></label>`).join('') +
+      '<div class="row"><button class="btn primary" id="odGo" type="button">この内容で読み込む</button><button class="btn" id="odClose" type="button">閉じる</button></div>';
+    $('#odClose').onclick = () => { box.hidden = true; };
+    $('#odGo').onclick = async () => {
+      const boxes = [...box.querySelectorAll('input[data-i]')];
+      lsSet('yame-od-skip', boxes.filter(b => !b.checked).map(b => files[+b.dataset.i].name));
+      const pick = boxes.filter(b => b.checked).map(b => files[+b.dataset.i]);
+      if (!pick.length) { toast('ファイルを1つ以上選んでください', 3000); return; }
+      box.textContent = `${pick.length}ファイルをダウンロードしています…`;
+      try {
+        const got = [];
+        for (const f of pick) {
+          const r = await fetch(f['@microsoft.graph.downloadUrl']);
+          if (!r.ok) throw new Error(`${f.name} をダウンロードできませんでした`);
+          got.push(new File([await r.blob()], f.name));
+        }
+        box.hidden = true;
+        freshNext = true;
+        await importFiles(got);
+      } catch (e) { box.textContent = e.message; }
+    };
+  } catch (e) {
+    box.textContent = e.message + '（もう一度押すとサインインからやり直します）';
+    lsSet('yame-od-tok', null);
+  }
+}
+$('#odBtn').addEventListener('click', () => {
+  if (!odReady()) {
+    toast(OD.client ? 'OneDriveからの読み込みは https://azviera.github.io/yame-map/ で開いたときに使えます' : 'OneDriveからの読み込みは準備中です', 6000);
+    return;
+  }
+  odShowList();
+});
+// back from the Microsoft sign-in page
+(async () => {
+  const q = new URLSearchParams(location.search);
+  if (!q.has('code') && !q.has('error')) return;
+  history.replaceState(null, '', location.pathname);
+  const p = lsGet('yame-od-pkce'); lsSet('yame-od-pkce', null);
+  if (q.has('error')) { toast('サインインできませんでした：' + (q.get('error_description') || q.get('error')), 8000); return; }
+  if (!p || p.state !== q.get('state') || !odReady()) return;
+  try {
+    await odTokenRequest({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: p.verifier });
+    if (lsGet('yame-od-pending')) { lsSet('yame-od-pending', null); openPanelIfPhone(); odShowList(); }
+  } catch (e) { toast(e.message, 8000); }
+})();
 $('#sampleBtn').addEventListener('click', () => { makeSample(); savedAt = null; clearData(); rebuild(true); toast('見本データに戻しました（覚えていたデータも消しました）'); });
 $('#fitBtn').addEventListener('click', fitAll);
 $('#storeBtn').addEventListener('click', () => map.setView([STORE.lat, STORE.lng], 16));
