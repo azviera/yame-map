@@ -1340,7 +1340,7 @@ document.addEventListener('change', e => {
   renderLabels();
 });
 // icons shrink as the map zooms out (and stay a little under full size when zoomed in)
-const iconScale = () => { const z = map.getZoom(); return z >= LABEL_ZOOM ? 0.85 : Math.max(0.45, 0.85 - (LABEL_ZOOM - z) * 0.1); };
+const iconScale = () => { const z = map.getZoom(); return z >= LABEL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (LABEL_ZOOM - z) * 0.08); };
 const applyIconScale = () => $('#map').style.setProperty('--s', iconScale());
 applyIconScale();
 map.on('zoomend', () => { applyIconScale(); refresh(); });
@@ -1354,7 +1354,7 @@ function passes(c, except) {
 function styleFor(c) {
   const sel = selected === c.code;
   const isS = c.rank === 'S';
-  const k = Math.max(0.6, iconScale());
+  const k = Math.max(0.45, iconScale());
   return { radius: (sel ? 11 : isS ? 8.5 : 7) * k, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
     color: sel ? css('--ink') : isS ? '#b07d00' : css('--pin-stroke'), weight: sel ? 3 : isS ? 3 : 1.5, renderer };
 }
