@@ -1012,6 +1012,7 @@ function ingest(rows, fileName) {
     for (const k in row) {
       const m = k.match(/^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付)$/);
       if (!m || m[1] === '顧客') continue;
+      if ((m[2] && m[2] !== '1') || /サブ$/.test(m[1])) continue;   // only the main unit (…1 columns): not テレビ2〜5 or サブ
       const g = groups[m[1] + m[2]] ||= { cat: catOf(m[1]) };
       const f = m[3].startsWith('品番') ? 'model' : m[3].startsWith('納品') ? 'date' : m[3].startsWith('設置') ? 'place' : 'disposed';
       g[f] = row[k];
