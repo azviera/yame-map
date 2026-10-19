@@ -1,0 +1,1471 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>八女 顧客マップ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+.leaflet-container {
+	overflow: hidden;
+	}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+	  -webkit-user-drag: none;
+	}
+.leaflet-tile::selection {
+	background: transparent;
+}
+.leaflet-safari .leaflet-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+.leaflet-safari .leaflet-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	display: block;
+	}
+.leaflet-container .leaflet-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+.leaflet-container .leaflet-marker-pane img,
+.leaflet-container .leaflet-shadow-pane img,
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container img.leaflet-image-layer,
+.leaflet-container .leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+.leaflet-container img.leaflet-tile {
+	mix-blend-mode: plus-lighter;
+}
+.leaflet-container.leaflet-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	touch-action: pan-x pan-y;
+	}
+.leaflet-container.leaflet-touch-drag {
+	-ms-touch-action: pinch-zoom;
+	touch-action: none;
+	touch-action: pinch-zoom;
+}
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {
+	-ms-touch-action: none;
+	touch-action: none;
+}
+.leaflet-container {
+	-webkit-tap-highlight-color: transparent;
+}
+.leaflet-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+.leaflet-tile {
+	filter: inherit;
+	visibility: hidden;
+	}
+.leaflet-tile-loaded {
+	visibility: inherit;
+	}
+.leaflet-zoom-box {
+	width: 0;
+	height: 0;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	z-index: 800;
+	}
+.leaflet-overlay-pane svg {
+	-moz-user-select: none;
+	}
+.leaflet-pane         { z-index: 400; }
+.leaflet-tile-pane    { z-index: 200; }
+.leaflet-overlay-pane { z-index: 400; }
+.leaflet-shadow-pane  { z-index: 500; }
+.leaflet-marker-pane  { z-index: 600; }
+.leaflet-tooltip-pane   { z-index: 650; }
+.leaflet-popup-pane   { z-index: 700; }
+.leaflet-map-pane canvas { z-index: 100; }
+.leaflet-map-pane svg    { z-index: 200; }
+.leaflet-vml-shape {
+	width: 1px;
+	height: 1px;
+	}
+.lvml {
+	behavior: url(#default#VML);
+	display: inline-block;
+	position: absolute;
+	}
+.leaflet-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: visiblePainted; 
+	pointer-events: auto;
+	}
+.leaflet-top,
+.leaflet-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+.leaflet-top {
+	top: 0;
+	}
+.leaflet-right {
+	right: 0;
+	}
+.leaflet-bottom {
+	bottom: 0;
+	}
+.leaflet-left {
+	left: 0;
+	}
+.leaflet-control {
+	float: left;
+	clear: both;
+	}
+.leaflet-right .leaflet-control {
+	float: right;
+	}
+.leaflet-top .leaflet-control {
+	margin-top: 10px;
+	}
+.leaflet-bottom .leaflet-control {
+	margin-bottom: 10px;
+	}
+.leaflet-left .leaflet-control {
+	margin-left: 10px;
+	}
+.leaflet-right .leaflet-control {
+	margin-right: 10px;
+	}
+.leaflet-fade-anim .leaflet-popup {
+	opacity: 0;
+	-webkit-transition: opacity 0.2s linear;
+	   -moz-transition: opacity 0.2s linear;
+	        transition: opacity 0.2s linear;
+	}
+.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {
+	opacity: 1;
+	}
+.leaflet-zoom-animated {
+	-webkit-transform-origin: 0 0;
+	    -ms-transform-origin: 0 0;
+	        transform-origin: 0 0;
+	}
+svg.leaflet-zoom-animated {
+	will-change: transform;
+}
+.leaflet-zoom-anim .leaflet-zoom-animated {
+	-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);
+	   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);
+	        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+.leaflet-zoom-anim .leaflet-tile,
+.leaflet-pan-anim .leaflet-tile {
+	-webkit-transition: none;
+	   -moz-transition: none;
+	        transition: none;
+	}
+.leaflet-zoom-anim .leaflet-zoom-hide {
+	visibility: hidden;
+	}
+.leaflet-interactive {
+	cursor: pointer;
+	}
+.leaflet-grab {
+	cursor: -webkit-grab;
+	cursor:    -moz-grab;
+	cursor:         grab;
+	}
+.leaflet-crosshair,
+.leaflet-crosshair .leaflet-interactive {
+	cursor: crosshair;
+	}
+.leaflet-popup-pane,
+.leaflet-control {
+	cursor: auto;
+	}
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+	cursor: move;
+	cursor: -webkit-grabbing;
+	cursor:    -moz-grabbing;
+	cursor:         grabbing;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-pane > svg path,
+.leaflet-tile-container {
+	pointer-events: none;
+	}
+.leaflet-marker-icon.leaflet-interactive,
+.leaflet-image-layer.leaflet-interactive,
+.leaflet-pane > svg path.leaflet-interactive,
+svg.leaflet-image-layer.leaflet-interactive path {
+	pointer-events: visiblePainted; 
+	pointer-events: auto;
+	}
+.leaflet-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+.leaflet-container a {
+	color: #0078A8;
+	}
+.leaflet-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+.leaflet-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+.leaflet-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+.leaflet-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+	background-color: #f4f4f4;
+	}
+.leaflet-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+.leaflet-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+.leaflet-bar a.leaflet-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+.leaflet-touch .leaflet-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+.leaflet-touch .leaflet-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+.leaflet-touch .leaflet-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {
+	font-size: 22px;
+	}
+.leaflet-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+.leaflet-control-layers-toggle {
+	background-image: url(images/layers.png);
+	width: 36px;
+	height: 36px;
+	}
+.leaflet-retina .leaflet-control-layers-toggle {
+	background-image: url(images/layers-2x.png);
+	background-size: 26px 26px;
+	}
+.leaflet-touch .leaflet-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+.leaflet-control-layers .leaflet-control-layers-list,
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+	display: none;
+	}
+.leaflet-control-layers-expanded .leaflet-control-layers-list {
+	display: block;
+	position: relative;
+	}
+.leaflet-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+.leaflet-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+.leaflet-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+.leaflet-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+.leaflet-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+.leaflet-default-icon-path { 
+	background-image: url(images/marker-icon.png);
+	}
+.leaflet-container .leaflet-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+.leaflet-control-attribution,
+.leaflet-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+.leaflet-control-attribution a {
+	text-decoration: none;
+	}
+.leaflet-control-attribution a:hover,
+.leaflet-control-attribution a:focus {
+	text-decoration: underline;
+	}
+.leaflet-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	}
+.leaflet-left .leaflet-control-scale {
+	margin-left: 5px;
+	}
+.leaflet-bottom .leaflet-control-scale {
+	margin-bottom: 5px;
+	}
+.leaflet-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+.leaflet-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+.leaflet-touch .leaflet-control-attribution,
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	box-shadow: none;
+	}
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+.leaflet-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+.leaflet-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+.leaflet-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+.leaflet-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+.leaflet-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+.leaflet-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+	margin: -10px auto 0;
+	pointer-events: auto;
+	-webkit-transform: rotate(45deg);
+	   -moz-transform: rotate(45deg);
+	    -ms-transform: rotate(45deg);
+	        transform: rotate(45deg);
+	}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+	color: #585858;
+	}
+.leaflet-popup-scrolled {
+	overflow: auto;
+	}
+.leaflet-oldie .leaflet-popup-content-wrapper {
+	-ms-zoom: 1;
+	}
+.leaflet-oldie .leaflet-popup-tip {
+	width: 24px;
+	margin: 0 auto;
+	-ms-filter: "progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";
+	filter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);
+	}
+.leaflet-oldie .leaflet-control-zoom,
+.leaflet-oldie .leaflet-control-layers,
+.leaflet-oldie .leaflet-popup-content-wrapper,
+.leaflet-oldie .leaflet-popup-tip {
+	border: 1px solid #999;
+	}
+.leaflet-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+.leaflet-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+.leaflet-tooltip.leaflet-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+.leaflet-tooltip-bottom {
+	margin-top: 6px;
+}
+.leaflet-tooltip-top {
+	margin-top: -6px;
+}
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+.leaflet-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+.leaflet-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+.leaflet-tooltip-left {
+	margin-left: -6px;
+}
+.leaflet-tooltip-right {
+	margin-left: 6px;
+}
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+.leaflet-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+.leaflet-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+@media print {
+	.leaflet-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		}
+	}
+
+</style>
+<style>
+/* Layout: full-height app. Map fills the screen; a left panel on PC becomes a pull-up sheet on phones; the customer card floats right on PC and rises from the bottom on phones. */
+:root{
+  --bg:#eef1ef; --surface:#ffffff; --surface-2:#f5f7f6; --ink:#1c2530; --muted:#5d6873; --line:#d5dbd8;
+  --accent:#0e6a87; --accent-ink:#ffffff; --accent-soft:#dcedf2; --map-bg:#e4e9e5; --grid:#d3dad5; --ring:#8aa3ad;
+  --pin-stroke:#ffffff; --shadow:0 6px 24px rgba(20,35,45,.16);
+  --f-body:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --top-h:56px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141a1f; --surface:#1d252c; --surface-2:#232d35; --ink:#e7ecef; --muted:#9aa8b3; --line:#33404a;
+  --accent:#4fb3d1; --accent-ink:#0b1a20; --accent-soft:#1d3a45; --map-bg:#1a2228; --grid:#26323a; --ring:#557280;
+  --pin-stroke:#10171c; --shadow:0 6px 24px rgba(0,0,0,.45); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#141a1f; --surface:#1d252c; --surface-2:#232d35; --ink:#e7ecef; --muted:#9aa8b3; --line:#33404a;
+  --accent:#4fb3d1; --accent-ink:#0b1a20; --accent-soft:#1d3a45; --map-bg:#1a2228; --grid:#26323a; --ring:#557280;
+  --pin-stroke:#10171c; --shadow:0 6px 24px rgba(0,0,0,.45); color-scheme:dark }
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;overflow:hidden}
+*{box-sizing:border-box}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:2000;background:var(--surface)}
+#app{height:100%;display:grid;grid-template-rows:auto 1fr;grid-template-columns:340px 1fr}
+
+/* top bar */
+#top{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:1000}
+#brand{font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap;display:flex;align-items:center;gap:8px}
+#brand .mark{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);display:inline-block}
+#search{flex:1 1 180px;min-width:0;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 12px}
+.colorby{display:flex;align-items:center;gap:6px}
+.colorby label{font-size:12px;color:var(--muted);white-space:nowrap}
+#dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
+.btn{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+#openPanel{display:none}
+
+/* side panel */
+#panel{grid-row:2;background:var(--surface);border-right:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column;
+  padding-block:14px 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;gap:18px;z-index:900}
+.sec h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
+.sec h2 a{color:var(--accent);cursor:pointer;letter-spacing:0;font-weight:400;text-decoration:none}
+#panelHead{display:none}
+.count{font-size:13px;color:var(--muted)}
+.count b{font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums}
+.datafile{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.datafile .row{display:flex;gap:8px;flex-wrap:wrap}
+.sample-tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;background:#f6e7b8;color:#5c4500;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px 4px 8px;cursor:pointer;font-size:13px;white-space:nowrap}
+.chip .dot{width:12px;height:12px;border-radius:50%;flex:none;border:1.5px solid var(--pin-stroke);box-shadow:0 0 0 1px var(--line)}
+.chip .n{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.chip.off{opacity:.42;text-decoration:line-through}
+.chip.off .dot{background:transparent!important}
+.fgroup{display:flex;flex-direction:column;gap:6px}
+.fgroup + .fgroup{margin-top:12px}
+.fgroup .t{font-size:13px;font-weight:700}
+#list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+#list li{display:flex;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+#list li:hover{background:var(--surface-2)}
+#list .dot{width:12px;height:12px;border-radius:50%;flex:none}
+#list .nm{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#list .sub{font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.more{font-size:12px;color:var(--muted);padding-top:6px}
+
+/* map */
+#mapwrap{grid-row:2;position:relative;min-width:0}
+#map{position:absolute;inset:0;background:var(--map-bg)}
+.leaflet-container{background:var(--map-bg);font-family:var(--f-body)}
+.gridbg{background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:48px 48px}
+#legend{position:absolute;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:800;display:flex;gap:6px;overflow-x:auto;padding:8px;
+  background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);scrollbar-width:none;width:fit-content;max-width:calc(100% - 24px)}
+#legend::-webkit-scrollbar{display:none}
+#legend .lt{font-size:12px;font-weight:700;color:var(--muted);align-self:center;white-space:nowrap;padding:0 4px}
+.mapbtns{position:absolute;top:12px;left:12px;z-index:800;display:flex;flex-direction:column;gap:6px}
+.mapbtns .btn{box-shadow:var(--shadow);font-size:13px;height:34px}
+.store-icon{background:var(--ink);color:var(--surface);font-weight:700;font-size:14px;width:30px!important;height:30px!important;border-radius:6px;display:grid;place-items:center;border:2px solid var(--surface);box-shadow:var(--shadow)}
+.ring-label{color:var(--ring);font-size:11px;font-weight:700;white-space:nowrap;background:none;border:none}
+
+/* house labels (zoomed in): logos left of the pin, name to the right, like the My Maps layers */
+.lab-wrap{background:none;border:none}
+.lab{position:relative;width:0;height:0;cursor:pointer}
+.lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.lb-star{position:absolute;left:-12px;top:-12px;width:24px;height:24px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
+.lb-left{position:absolute;right:12px;top:-24px;display:grid;grid-template-rows:16px 16px 16px;justify-items:end}
+.lb-left .r{display:flex;gap:2px;height:16px;align-items:center}
+.lb-b{font-style:normal;font-weight:900;font-size:12px;line-height:14px;height:16px;min-width:16px;padding:0 2px;text-align:center;color:#fff;border-radius:1px;border:1px solid #000;white-space:nowrap}
+.lb-g{font-style:normal;font-weight:900;font-size:15px;line-height:16px;min-width:13px;text-align:center;font-family:"Arial Black","Hiragino Sans","BIZ UDPGothic",sans-serif;paint-order:stroke fill}
+.lb-g.k{-webkit-text-stroke:3px #000}
+.lb-g.w{-webkit-text-stroke:3px #fff}
+.lb-g.dg{font-size:14px}
+.lb-b.maru{background-image:linear-gradient(transparent 36%,#ffe94d 36%,#ffe94d 64%,transparent 64%)}
+.lb-sora{background:#5fe3f0;color:#000;border-color:#000}
+.lb-dash{display:inline-block;width:16px;height:6px;border-radius:3px;background:#111;border:1px solid #fff}
+.kpin{display:inline-block;width:13px;height:13px;border-radius:50%;border:1.5px solid #000}
+.kstar svg{position:static;width:16px;height:16px;display:block}
+.lb-dg{font-style:normal;font-weight:700;font-size:14px;line-height:16px;min-width:12px;text-align:center;-webkit-text-stroke:3px #fff;paint-order:stroke fill}
+.lb-name{position:absolute;left:13px;top:-10px;white-space:nowrap;font-weight:700;font-size:14px;line-height:20px;color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 3px #000,1px 1px 2px #000}
+.keyrow{display:grid;grid-template-columns:96px 1fr;align-items:start;gap:8px;font-size:12px}
+.keyrow .ic{display:flex;gap:2px;justify-content:flex-end}
+.keyrow .lb-b,.keyrow .lb-dg{position:static}
+.widesel{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:13px;font-weight:700}
+.widesel select{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
+.logo-chip{display:inline-flex;align-items:center;gap:6px}
+.logo-chip input{width:18px;height:18px;margin:0}
+.lkey{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;margin-top:10px}
+
+/* detail card */
+#card{position:absolute;top:12px;right:12px;bottom:12px;width:360px;max-width:calc(100% - 24px);z-index:850;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+#card .hd{padding:14px 16px 12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+#card .hd .who{flex:1;min-width:0}
+#card .nm{font-size:20px;font-weight:700;line-height:1.3}
+#card .code{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+#card .x{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;flex:none;font-size:18px;line-height:1}
+#card .bd{overflow-y:auto;padding:12px 16px 18px;display:flex;flex-direction:column;gap:16px}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.badge{font-size:12px;font-weight:700;border-radius:6px;padding:2px 8px;color:#fff;white-space:nowrap}
+.badge.ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);font-weight:400}
+.blk h3{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0 0 6px}
+.addr{font-size:14px}
+.links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.links a{font-size:13px;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:6px 10px;text-decoration:none}
+.appl{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:baseline;font-size:14px}
+.appl .k{font-weight:700}
+.appl .m{color:var(--muted);font-size:12px;min-width:0}
+.age{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;color:#fff;white-space:nowrap;justify-self:end}
+.hist{list-style:none;margin:0;padding:0;font-size:13px}
+.hist li{display:grid;grid-template-columns:86px 1fr;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.hist .d{font-variant-numeric:tabular-nums;color:var(--muted)}
+.empty{font-size:13px;color:var(--muted)}
+
+#toast{position:fixed;left:50%;top:calc(var(--top-h) + 12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:3000;background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:14px;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+
+/* phones and small tablets */
+@media (max-width:860px){
+  #app{grid-template-columns:1fr}
+  #brand .txt{display:none}
+  #search{order:3;flex:1 1 100%}
+  #dim{max-width:52vw}
+  .colorby label{display:none}
+  #openPanel{display:inline-block}
+  #loadTop{display:none}
+  #panel{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:82%;border-right:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
+    padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(105%);transition:transform .22s ease;z-index:1500}
+  #panel.open{transform:none}
+  #panelHead{display:flex;justify-content:space-between;align-items:center}
+  #panelHead b{font-size:16px}
+  #mapwrap{grid-column:1}
+  #card{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:64%;border-radius:16px 16px 0 0;border-bottom:none;padding-bottom:env(safe-area-inset-bottom,0px)}
+  #legend{left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){#panel{transition:none}}
+</style>
+
+<div id="app">
+  <header id="top">
+    <div id="brand"><span class="mark" aria-hidden="true"></span><span class="txt">八女 顧客マップ</span></div>
+    <input id="search" type="search" placeholder="名前・顧客コード・住所で探す" aria-label="顧客を探す">
+    <div class="colorby"><label for="dim">ピンの色分け</label>
+      <select id="dim"></select></div>
+    <button class="btn" id="openPanel" type="button">絞り込み</button>
+  </header>
+
+  <aside id="panel" aria-label="絞り込みと一覧">
+    <div id="panelHead"><b>絞り込み・一覧</b><button class="btn" id="closePanel" type="button">閉じる</button></div>
+    <div class="sec">
+      <div class="count">地図に表示中 <b id="shown">0</b> / <span id="total">0</span> 件</div>
+    </div>
+    <div class="sec datafile">
+      <h2>データ</h2>
+      <div id="dataState"></div>
+      <div class="row">
+        <button class="btn primary" id="loadBtn" type="button">CSV・Excelを読み込む</button>
+        <button class="btn" id="sampleBtn" type="button">見本に戻す</button>
+      </div>
+      <input id="file" type="file" accept=".csv,.xlsx,.xls,.txt" multiple hidden>
+      <div>店クラウドVのCSVや編集したExcelを何本でも選べます。顧客コードで1人1本のピンにまとめます。ファイルはこの端末の中だけで読み込み、外へ送りません。</div>
+    </div>
+    <div class="sec">
+      <h2>地図に出すロゴ</h2>
+      <div class="widesel"><label for="wideSel">広域で出すアイコン</label>
+        <select id="wideSel">
+          <option value="dot">色の点だけ（ピンの色分け）</option>
+          <option value="rfm">RFMランク（A〜E）</option>
+          <option value="s">顧客ランクS</option>
+          <option value="catalog">お店誌の担当（★はなし）</option>
+          <option value="rice">炊飯器</option>
+          <option value="range">レンジ</option>
+          <option value="ih">IH</option>
+          <option value="contact">接点 1・2・3</option>
+          <option value="visit">訪問</option>
+          <option value="all">拡大時と同じ全部のアイコン</option>
+        </select></div>
+      <div class="chips" id="logoToggles"></div>
+      <div class="lkey" id="logoKey"></div>
+    </div>
+    <div class="sec">
+      <h2>絞り込み <a id="resetF">すべて表示</a></h2>
+      <div id="filters"></div>
+    </div>
+    <div class="sec">
+      <h2>一覧</h2>
+      <ul id="list"></ul>
+      <div class="more" id="listMore"></div>
+    </div>
+  </aside>
+
+  <main id="mapwrap">
+    <div id="map" class="gridbg"></div>
+    <div class="mapbtns">
+      <button class="btn" id="fitBtn" type="button">全体</button>
+      <button class="btn" id="storeBtn" type="button">お店</button>
+      <button class="btn" id="zin" type="button" aria-label="拡大">＋</button>
+      <button class="btn" id="zout" type="button" aria-label="縮小">－</button>
+      <select class="btn" id="baseSel" aria-label="地図の種類">
+        <option value="pale">淡色地図</option>
+        <option value="std">標準地図</option>
+        <option value="photo">航空写真</option>
+        <option value="osm">OpenStreetMap</option>
+      </select>
+    </div>
+    <div id="legend" aria-label="凡例（タップで表示・非表示）"></div>
+    <section id="card" hidden aria-live="polite"></section>
+  </main>
+</div>
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+'use strict';
+const STORE = { name: 'お店（店頭販売）', lat: 33.2118, lng: 130.5578 };
+const TODAY = new Date();
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const normStaff = s => String(s ?? '').replace(/[\s　]+/g, ' ').trim();
+const GREY = '#9aa3ab';
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- colour dimensions ---------- */
+// CP target thresholds, same as the My Maps layers: 炊飯器 8年 / レンジ 10年 / IH 12年
+const TH = { '炊飯器':8, 'レンジ':10, 'IH':12 };
+const OVER = '#3fd8e8', UNDER = '#e3262b';
+const ageOrder = cat => [`${TH[cat]}年以上`, `${TH[cat]}年未満`, '所有なし'];
+const ageCols = cat => ({ [`${TH[cat]}年以上`]:OVER, [`${TH[cat]}年未満`]:UNDER, '所有なし':GREY });
+// an appliance without a delivery date (owned elsewhere, seen on a visit) carries its age class from the カスタム column
+const isOver = (cat, a) => a.date ? yearsSince(a.date) >= (TH[cat] || 8) : !!a.over;
+const ageCol = (cat, a) => isOver(cat, a) ? OVER : UNDER;
+// staff are shown by one-letter aliases; real names are matched by hash only, so the page itself carries no names
+const STAFF = ['ト','タ','テ','ヤ','ミ'];
+const STAFF_COL = {'ト':'#e53de8','タ':'#1a1ae6','テ':'#6fd13d','ヤ':'#b0653a','ミ':'#9c9c9c'};
+const STORE_STAFF = 'ミ';
+const STAFF_HASH = { 3799823507:'ト', 752748626:'タ', 1598834499:'テ', 295177741:'ヤ' };
+const fnv = s => { let x = 0x811c9dc5; for (const ch of s) x = Math.imul(x ^ ch.charCodeAt(0), 0x01000193) >>> 0; return x; };
+const squash = s => String(s ?? '').replace(/[\s　]+/g, '').replace(/彌/g, '弥');
+function staffAlias(s) {
+  const n = squash(s); if (!n) return '';
+  if (STAFF.includes(n)) return n;
+  if (/店頭/.test(n)) return STORE_STAFF;
+  return STAFF_HASH[fnv(n)] || normStaff(s);
+}
+// カスタム like "<氏名>3見込み": find a staff name at the start
+function staffFromCustom(s) {
+  const n = squash(s);
+  for (let len = 2; len <= Math.min(8, n.length); len++) { const a = STAFF_HASH[fnv(n.slice(0, len))]; if (a) return a; }
+  return /店頭/.test(n) ? STORE_STAFF : '';
+}
+const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH' };
+const DIMS = {
+  rfm:   { label:'RFMランク', order:['A','B','C','D','E','-','未設定'],
+           colors:{A:'#ffe500',B:'#a6ea5c',C:'#f2a23a',D:'#b9997c',E:'#e8402a','-':'#222222','未設定':'#5fe3f0'}, get:c => c.rfm || '未設定' },
+  rank:  { label:'顧客ランク', order:['S','A','B','C','D','E','未設定'],
+           colors:{S:'#2346f0',A:'#2f68c8',B:'#1a9a8a',C:'#7b5fc0',D:'#8a8f96',E:'#b0b5ba','未設定':GREY}, get:c => c.rank || '未設定' },
+  staff: { label:'担当者', order:[...STAFF,'未接点'], colors:{...STAFF_COL,'未接点':'#d0d4d8'}, get:c => c.staff || '未接点' },
+  catalog:{ label:'お店誌', order:[...STAFF,'お店誌なし'], colors:{...STAFF_COL,'お店誌なし':'#ffe94d'}, get:c => c.catalog || 'お店誌なし' },
+  rice:  { label:'炊飯器 所有年数', order:ageOrder('炊飯器'), colors:ageCols('炊飯器'), get:c => ageBucket(c, '炊飯器') },
+  range: { label:'レンジ 所有年数', order:ageOrder('レンジ'), colors:ageCols('レンジ'), get:c => ageBucket(c, 'レンジ') },
+  ih:    { label:'IH 所有年数', order:ageOrder('IH'), colors:ageCols('IH'), get:c => ageBucket(c, 'IH') },
+  stage: { label:'接点段階', order:['見込み','推進','チラシ','その他','接点なし'],
+           colors:{'見込み':'#c2362b','推進':'#e07b25','チラシ':'#2f68c8','その他':'#7b5fc0','接点なし':GREY}, get:c => c.stage },
+  visit: { label:'訪問確認', order:['訪問済み','未訪問'], colors:{'訪問済み':'#0b6e4f','未訪問':GREY}, get:c => c.visits.length ? '訪問済み' : '未訪問' },
+};
+const EXTRA = ['#5b7083','#a0522d','#6b8e23','#4682b4','#9370db','#cd5c5c'];
+function colorOf(dim, v) {
+  const d = DIMS[dim];
+  if (d.colors[v]) return d.colors[v];
+  const i = Math.abs([...String(v)].reduce((a, ch) => a * 31 + ch.charCodeAt(0) | 0, 7)) % EXTRA.length;
+  return EXTRA[i];
+}
+
+/* ---------- dates & ages ---------- */
+function parseDate(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === 'number' || /^\d{5}(\.\d+)?$/.test(String(v).trim())) {   // Excel serial
+    const n = Number(v); if (n < 20000 || n > 80000) return null;
+    return new Date(Math.round((n - 25569) * 86400000));
+  }
+  const s = String(v).trim().replace(/[年月]/g, '/').replace(/日/, '').replace(/-/g, '/');
+  let m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);       // m/d/yyyy
+  if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+  const d = new Date(s); return isNaN(d) ? null : d;
+}
+const fmtDate = d => d ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` : '';
+const yearsSince = d => (TODAY - d) / (365.2425 * 86400000);
+function fmtAge(d) {
+  const months = Math.floor(yearsSince(d) * 12);
+  return `${Math.floor(months / 12)}年${months % 12}か月`;
+}
+function bucketOf(y) { return y >= 12 ? '12年以上' : y >= 10 ? '10〜12年' : y >= 8 ? '8〜10年' : '8年未満'; }
+function currentAppliance(c, cat) {
+  const list = (c.appl[cat] || []).filter(a => (a.date || a.over != null) && !a.disposed);
+  list.sort((a, b) => (b.date || 0) - (a.date || 0));
+  return list[0] || null;
+}
+function ageBucket(c, cat) {
+  const a = currentAppliance(c, cat);
+  if (!a) return '所有なし';
+  return isOver(cat, a) ? `${TH[cat]}年以上` : `${TH[cat]}年未満`;
+}
+
+/* ---------- data store & import ---------- */
+let customers = new Map();
+let markers = new Map();
+let sources = [];
+let isSample = true;
+
+function pick(row, names) {
+  for (const n of names) { const v = row[n]; if (v != null && String(v).trim() !== '') return v; }
+  return '';
+}
+function parseLatLng(row) {
+  const z = String(pick(row, ['座標', '緯度経度']) || '');
+  let m = z.match(/(-?\d+(?:\.\d+)?)\s*[,，、\s]\s*(-?\d+(?:\.\d+)?)/);
+  if (m) return [+m[1], +m[2]];
+  const lat = parseFloat(pick(row, ['緯度'])), lng = parseFloat(pick(row, ['経度']));
+  return isFinite(lat) && isFinite(lng) ? [lat, lng] : null;
+}
+function stageOf(kind) {
+  if (/見込/.test(kind)) return '見込み';
+  if (/推進/.test(kind)) return '推進';
+  if (/チラシ/.test(kind)) return 'チラシ';
+  return 'その他';
+}
+const STAGE_RANK = { '見込み':4, '推進':3, 'チラシ':2, 'その他':1, '接点なし':0 };
+function catOf(prefix) {
+  if (/炊飯/.test(prefix)) return '炊飯器';
+  if (/レンジ|オーブン/.test(prefix)) return 'レンジ';
+  if (/IH|ＩＨ|クッキング|コンロ|熱源/i.test(prefix)) return 'IH';
+  return prefix.replace(/\d+$/, '') || 'その他';
+}
+
+function ingest(rows, fileName) {
+  const visitFile = /訪問/.test(fileName);
+  let used = 0;
+  for (const raw of rows) {
+    const row = {};
+    for (const k in raw) row[String(k).replace(/[\s　]/g, '')] = raw[k];
+    const code = String(pick(row, ['顧客コード', '顧客CD', '顧客番号'])).trim();
+    if (!code) continue;
+    used++;
+    let c = customers.get(code);
+    if (!c) { c = { code, name:'', addr:'', addr2:'', lat:null, lng:null, rank:'', rfm:'', events:[], visits:[], appl:{}, keys:new Set() }; customers.set(code, c); }
+    const name = pick(row, ['顧客名称', '顧客名', '氏名']); if (name) c.name = String(name).trim();
+    // RFM files carry the address in 結合済み instead of 住所
+    let addr = pick(row, ['住所']);
+    if (!addr) { const j = String(pick(row, ['結合済み', '住所結合'])); if (/[都道府県市区町村]|\d+-\d+/.test(j)) addr = j; }
+    if (addr) c.addr = String(addr).trim();
+    const addr2 = pick(row, ['補記住所']); if (addr2) c.addr2 = String(addr2).trim();
+    const ll = parseLatLng(row); if (ll) [c.lat, c.lng] = ll;
+    const rank = pick(row, ['顧客ランク区分', '顧客ランク']); if (rank) c.rank = String(rank).trim().toUpperCase();
+    const rfm = pick(row, ['RFMランク区分', 'RFMランク', 'RFM']); if (rfm) c.rfm = String(rfm).trim().toUpperCase();
+
+    // contacts and visits
+    const kind = String(pick(row, ['接点内容区分', '接点内容'])).trim();
+    const custom = String(pick(row, ['カスタム'])).trim();
+    const date = parseDate(pick(row, ['接点日', '訪問日']));
+    const staffOf = () => staffAlias(pick(row, ['担当者名', '担当者'])) || staffFromCustom(custom);
+    const isCatalog = /お店誌|特選品/.test(fileName + ' ' + kind + ' ' + custom);
+    if (isCatalog) { const st = staffOf(); if (st) c.catalog = st; }
+    else if (kind || date) {
+      const staff = staffOf();
+      const isVisit = /訪問/.test(kind) || /訪問/.test(custom) || visitFile;
+      const key = [isVisit ? 'v' : 'e', fmtDate(date), staff, kind].join('|');
+      if (!c.keys.has(key)) {
+        c.keys.add(key);
+        (isVisit ? c.visits : c.events).push({ date, staff, kind: kind || (isVisit ? '訪問' : ''), custom });
+      }
+    }
+
+    // appliances: columns like 炊飯器1品番 / 炊飯器1納品日付 / 炊飯器1設置場所区分 / 炊飯器1廃棄日付
+    const groups = {};
+    for (const k in row) {
+      const m = k.match(/^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付)$/);
+      if (!m || m[1] === '顧客') continue;
+      const g = groups[m[1] + m[2]] ||= { cat: catOf(m[1]) };
+      const f = m[3].startsWith('品番') ? 'model' : m[3].startsWith('納品') ? 'date' : m[3].startsWith('設置') ? 'place' : 'disposed';
+      g[f] = row[k];
+    }
+    const dated = new Set();
+    for (const g of Object.values(groups)) {
+      const d = parseDate(g.date); const model = String(g.model ?? '').trim();
+      if (!d && !model) continue;
+      const key = ['a', g.cat, model, fmtDate(d)].join('|');
+      if (c.keys.has(key)) continue;
+      c.keys.add(key);
+      (c.appl[g.cat] ||= []).push({ model, date: d, place: String(g.place ?? '').trim(), disposed: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
+      if (d) dated.add(g.cat);
+    }
+    // カスタム like "8年以上○": ○ = ownership confirmed by eye; no delivery date needed
+    const am = custom.match(/(\d+)\s*年\s*(以上|未満)/);
+    if (am) {
+      const fileCat = /炊飯/.test(fileName) ? '炊飯器' : /レンジ/.test(fileName) ? 'レンジ' : /IH|ＩＨ|クッキング/i.test(fileName) ? 'IH'
+        : Object.keys(TH).find(k => TH[k] === +am[1]);
+      if (fileCat && !dated.has(fileCat)) {
+        const maru = /[○〇◯]/.test(custom), over = am[2] === '以上';
+        const key = ['a', fileCat, 'seen', over, maru].join('|');
+        if (!c.keys.has(key)) { c.keys.add(key); (c.appl[fileCat] ||= []).push({ model: '', date: null, place: '', disposed: null, over, maru }); }
+      }
+    }
+  }
+  return used;
+}
+
+function finalize() {
+  for (const c of customers.values()) {
+    const all = [...c.events, ...c.visits].filter(e => e.staff);
+    all.sort((a, b) => (b.date || 0) - (a.date || 0));
+    c.staff = all.length ? all[0].staff : '';
+    c.stage = c.events.reduce((best, e) => { const s = stageOf(e.kind); return STAGE_RANK[s] > STAGE_RANK[best] ? s : best; }, '接点なし');
+    c.vals = {};
+    for (const k in DIMS) c.vals[k] = DIMS[k].get(c);
+    c.search = `${c.name} ${c.code} ${c.addr} ${c.addr2}`.toLowerCase();
+  }
+}
+
+/* ---------- file reading ---------- */
+function decodeText(buf) {
+  const u8 = new Uint8Array(buf);
+  if (u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) return new TextDecoder('utf-8').decode(u8.subarray(3));
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); }
+  catch { return new TextDecoder('shift_jis').decode(u8); }   // 店クラウドV / Excel CSV
+}
+function parseCSV(text) {
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ',' || ch === '\t') { row.push(f); f = ''; }
+    else if (ch === '\n') { row.push(f); rows.push(row); row = []; f = ''; }
+    else if (ch !== '\r') f += ch;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+function arraysToObjects(arr) {
+  let h = arr.findIndex((r, i) => i < 15 && r.some(v => /顧客コード|顧客CD|顧客番号/.test(String(v).replace(/[\s　]/g, ''))));
+  let codeFirst = false;
+  if (h < 0) {   // some sheets lose the 顧客コード heading (e.g. "ra"); use the first column when the row still has 顧客名称 or 座標
+    h = arr.findIndex((r, i) => i < 15 && r.some(v => /^(顧客名称|顧客名|座標)$/.test(String(v).replace(/[\s　]/g, ''))));
+    if (h < 0) return null;
+    codeFirst = true;
+  }
+  const head = arr[h].map(v => String(v ?? '').trim());
+  if (codeFirst) head[0] = '顧客コード';
+  return arr.slice(h + 1).filter(r => r.some(v => String(v ?? '').trim() !== '')).map(r => {
+    const o = {}; head.forEach((k, i) => { if (k) o[k] = r[i] ?? ''; }); return o;
+  });
+}
+let xlsxReady = null;
+function loadXLSX() {
+  return xlsxReady ||= new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => res(window.XLSX); s.onerror = () => { xlsxReady = null; rej(new Error('Excel読み込み部品を取得できませんでした')); };
+    document.head.appendChild(s);
+  });
+}
+async function readFile(file) {
+  const buf = await file.arrayBuffer();
+  if (/\.xlsx?$/i.test(file.name)) {
+    const XLSX = await loadXLSX();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    // only the leftmost sheet is the map data; other sheets are working copies
+    const arr = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true });
+    return arraysToObjects(arr) || [];
+  }
+  return arraysToObjects(parseCSV(decodeText(buf))) || [];
+}
+async function importFiles(files) {
+  if (!files.length) return;
+  if (isSample) { customers = new Map(); sources = []; isSample = false; }
+  let rows = 0; const bad = [];
+  for (const f of files) {
+    try {
+      const objs = await readFile(f);
+      const n = ingest(objs, f.name);
+      if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); }
+    } catch (e) { bad.push(`${f.name}：${e.message}`); }
+  }
+  finalize(); rebuild(true);
+  const noXY = [...customers.values()].filter(c => c.lat == null).length;
+  let msg = `${files.length}ファイル・${rows.toLocaleString()}行を読み込み、${customers.size.toLocaleString()}人にまとめました。`;
+  if (noXY) msg += ` 座標がない ${noXY}人は一覧のみに出ます。`;
+  if (bad.length) msg += ` 顧客コードの列が見つからなかったファイル：${bad.join('、')}`;
+  toast(msg, 7000);
+}
+
+/* ---------- fictional sample data ---------- */
+function makeSample() {
+  let seed = 20261018;
+  const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const pickR = a => a[Math.floor(rnd() * a.length)];
+  const wpick = (items) => { let r = rnd() * items.reduce((s, x) => s + x[1], 0); for (const [v, w] of items) { if ((r -= w) < 0) return v; } return items[0][0]; };
+  const fam = ['田中','古賀','堤','江崎','中島','松本','平井','井上','坂本','野口','牛島','栗原','石橋','樋口','大坪','原田','隈本','吉開','中尾','鶴','高木','緒方','秋山','城戸','角','今村','荒巻','月足','檀','山口'];
+  const giv = ['和子','洋子','博','誠','幸子','正人','恵子','隆','美智子','健一','節子','茂','久美子','勝','典子','浩二','由美','清','真由美','修','直子','明','千代子','孝','裕子'];
+  const areas = [['本町',33.2122,130.5590],['本村',33.2080,130.5525],['稲富',33.2165,130.5470],['蒲原',33.2230,130.5465],['馬場',33.2050,130.5655],
+    ['室岡',33.2290,130.5345],['吉田',33.2205,130.5710],['豊福',33.2140,130.5125],['亀甲',33.2005,130.5410],['鵜池',33.2290,130.5600],['酒井田',33.2010,130.5180],['立花町谷川',33.2210,130.5980]];
+  const rice = ['SR-SSX180','NP-ZW10','JPI-X100','RC-10ZWT','SR-M10A','NW-FB10'];
+  const range = ['NE-BS9B','ER-XD3000','MRO-W10','RE-WF183','NE-FS3B'];
+  const ih = ['KZ-AN56S','CS-G32MS','HT-M60S','KZ-G32AK'];
+  const places = ['キッチン','台所','居間','1階','離れ'];
+  const staffW = [['ト',55],['タ',18],['テ',10],['ヤ',5],[STORE_STAFF,12]];
+  const dateBetween = (y0, y1) => new Date(y0 + rnd() * (y1 - y0), 0, 1 + Math.floor(rnd() * 365));
+  const base = [], cp = [], contact = [], visit = [], catalog = [];
+  for (let i = 0; i < 180; i++) {
+    const a = pickR(areas);
+    const r = 0.0012 + rnd() * 0.009, th = rnd() * Math.PI * 2;
+    const lat = a[1] + Math.sin(th) * r, lng = a[2] + Math.cos(th) * r * 1.2;
+    const code = String(100 + i * 7 + Math.floor(rnd() * 6));
+    const b = { 顧客コード: code, 顧客名称: `${pickR(fam)}　${pickR(giv)}`, 住所: `福岡県八女市${a[0]}${Math.floor(rnd() * 1800) + 1}-${Math.floor(rnd() * 20) + 1}`,
+      補記住所: rnd() < 0.1 ? '裏の倉庫側から' : '', 座標: `${lat.toFixed(7)}, ${lng.toFixed(7)}`,
+      顧客ランク区分: rnd() < 0.08 ? 'S' : wpick([['A',25],['B',35],['C',30],['D',10]]),
+      RFMランク区分: wpick([['A',18],['B',24],['C',26],['D',18],['E',14],['-',6],['',3]]) };
+    base.push(b);
+    const p = { ...b };
+    if (rnd() < 0.12) p['カスタム'] = '○';
+    if (rnd() < 0.08) { p['カスタム'] = rnd() < 0.6 ? '8年以上○' : '8年未満○'; }
+    else if (rnd() < 0.78) { p['炊飯器1品番'] = pickR(rice); p['炊飯器1納品日付'] = fmtDate(dateBetween(2009, 2026.6)); p['炊飯器1設置場所区分'] = pickR(places); }
+    if (rnd() < 0.62) { p['レンジ1品番'] = pickR(range); p['レンジ1納品日付'] = fmtDate(dateBetween(2010, 2026.6)); }
+    if (rnd() < 0.28) { p['IH1品番'] = pickR(ih); p['IH1納品日付'] = fmtDate(dateBetween(2008, 2026.4)); }
+    cp.push(p);
+    const staff = wpick(staffW);
+    if (staff !== STORE_STAFF && rnd() < 0.7) catalog.push({ ...b, 担当者名: staff, カスタム: staff + '特選品秋' });
+    const nC = wpick([[0,22],[1,45],[2,25],[3,8]]);
+    for (let k = 0; k < nC; k++) {
+      const kind = k === 0 ? '1チラシ' : k === 1 ? '2推進' : '3見込み';
+      contact.push({ ...b, 接点日: fmtDate(new Date(2026, 8, 1 + Math.floor(rnd() * 46))), 担当者名: staff, 接点内容区分: kind, カスタム: staff.replace('　', ' ') + kind });
+    }
+    if (nC && rnd() < 0.55) visit.push({ ...b, 接点日: fmtDate(new Date(2026, 8, 3 + Math.floor(rnd() * 44))), 担当者名: staff, 接点内容区分: '訪問', カスタム: staff + '訪問' });
+  }
+  customers = new Map(); sources = [];
+  ingest(catalog, '見本_お店誌秋.xlsx'); ingest(cp, '見本_調理家電CP.xlsx'); ingest(contact, '見本_接点情報.xlsx'); ingest(visit, '見本_訪問確認.xlsx');
+  sources = ['見本_お店誌秋.xlsx', '見本_調理家電CP.xlsx', '見本_接点情報.xlsx', '見本_訪問確認.xlsx'];
+  isSample = true;
+  finalize();
+}
+
+/* ---------- map ---------- */
+const map = L.map('map', { minZoom: 5, zoomControl: false, preferCanvas: true, attributionControl: true }).setView([STORE.lat, STORE.lng], 14);
+const renderer = L.canvas({ tolerance: 8 });
+let tileFailed = false;
+const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>';
+const BASES = {
+  pale:  ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', { maxNativeZoom: 18, attribution: GSI_ATTR }],
+  std:   ['https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { maxNativeZoom: 18, attribution: GSI_ATTR }],
+  photo: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', { maxNativeZoom: 18, attribution: GSI_ATTR }],
+  osm:   ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }],
+};
+let baseKey = 'pale';
+try { if (BASES[localStorage.getItem('yame-base')]) baseKey = localStorage.getItem('yame-base'); } catch {}
+let tiles = null;
+function setBase(k) {
+  if (tiles) map.removeLayer(tiles);
+  baseKey = k; tileFailed = false;
+  let loaded = false;
+  tiles = L.tileLayer(BASES[k][0], { maxZoom: 19, ...BASES[k][1] }).addTo(map);
+  // keep the layer even when tiles fail, so the map comes back by itself once the connection does
+  tiles.on('tileerror', () => {
+    if (loaded || tileFailed) return; tileFailed = true;
+    renderDataState();
+  });
+  tiles.on('tileload', () => {
+    loaded = true; $('#map').classList.remove('gridbg');
+    if (tileFailed) { tileFailed = false; renderDataState(); }
+  });
+  try { localStorage.setItem('yame-base', k); } catch {}
+}
+setBase(baseKey);
+$('#baseSel').value = baseKey;
+$('#baseSel').addEventListener('change', e => { setBase(e.target.value); renderDataState(); });
+// distance rings from the store
+for (const km of [1, 2, 3, 5]) {
+  L.circle([STORE.lat, STORE.lng], { radius: km * 1000, color: css('--ring'), weight: 1, dashArray: '4 6', fill: false, interactive: false, renderer }).addTo(map);
+  L.marker([STORE.lat + km / 111.0, STORE.lng], { interactive: false, icon: L.divIcon({ className: 'ring-label', html: `${km}km`, iconSize: [40, 14], iconAnchor: [20, 16] }) }).addTo(map);
+}
+const storeMarker = L.marker([STORE.lat, STORE.lng], { zIndexOffset: 1000, title: STORE.name,
+  icon: L.divIcon({ className: 'store-icon', html: '店', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(map)
+  .on('click', () => toast('お店（店頭販売の来店客は担当者「ミ」として色分け・絞り込みできます）', 4500));
+
+let dim = 'staff';
+let hidden = {}; for (const k in DIMS) hidden[k] = new Set();
+let query = '';
+let selected = null;
+
+const LABEL_ZOOM = 15;
+const LOGOS = [
+  { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
+  { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
+  { k:'ih', label:'IH' }, { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
+];
+const show = Object.fromEntries(LOGOS.map(l => [l.k, true]));
+try { Object.assign(show, JSON.parse(localStorage.getItem('yame-logos2') || '{}')); } catch {}
+const labelLayer = L.layerGroup().addTo(map);
+const STAGE_NO = { 'チラシ':1, '推進':2, '見込み':3 };
+const staffColor = s => STAFF_COL[s] || GREY;
+const STAR = `<svg class="lb-star" viewBox="0 0 24 24"><path d="M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z" fill="#ffe94d" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+const glyph = (t, col, cls = '') => `<i class="lb-g ${cls}" style="color:${col}">${t}</i>`;
+const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${a.maru ? ' maru' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
+function labelHTML(c) {
+  const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','IH','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
+    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
+  }).join('');
+  let row2 = '';
+  if (show.visit && c.visits.length) {
+    const v = [...c.visits].sort((a, b) => (b.date || 0) - (a.date || 0))[0];
+    row2 += glyph(v.staff === STORE_STAFF ? '来' : '訪', staffColor(v.staff), 'w');
+  }
+  if (c.rfm && c.rfm !== '-') { if (show.rfm) row2 += glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k'); }
+  else if (show.blank) row2 += c.rfm === '-' ? '<i class="lb-dash"></i>' : '<i class="lb-b lb-sora">空</i>';
+  if (show.s && c.rank === 'S') row2 += glyph('S', '#2346f0', 'k');
+  let row3 = '';
+  if (show.contact) {
+    const seen = new Map();
+    for (const e of c.events) { const n = STAGE_NO[stageOf(e.kind)]; if (n && !seen.has(n)) seen.set(n, staffColor(e.staff)); }
+    row3 = [...seen.keys()].sort().map(n => glyph(n, seen.get(n), 'w dg')).join('');
+  }
+  let pin = '';
+  if (show.catalog) pin = c.catalog ? `<span class="lb-pin" style="background:${staffColor(c.catalog)}"></span>` : STAR;
+  else pin = `<span class="lb-pin" style="background:${colorOf(dim, c.vals[dim])}"></span>`;
+  const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
+  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
+}
+// zoomed out: the coloured pin plus the one logo picked in 広域で出すアイコン
+let wideIcon = 'dot';
+try { const w = localStorage.getItem('yame-wide'); if (w && $(`#wideSel option[value="${w}"]`)) wideIcon = w; } catch {}
+function wideHTML(c) {
+  if (wideIcon === 'all') return labelHTML(c);
+  let mark = '';
+  if (wideIcon === 'rfm') mark = c.rfm && c.rfm !== '-' ? glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k') : '';
+  else if (wideIcon === 's') mark = c.rank === 'S' ? glyph('S', '#2346f0', 'k') : '';
+  else if (APPL[wideIcon]) { const cat = APPL[wideIcon], a = currentAppliance(c, cat); mark = a ? box(cat === '炊飯器' ? '炊' : cat === 'レンジ' ? 'レ' : 'IH', a, cat) : ''; }
+  else if (wideIcon === 'contact') {
+    const seen = new Map();
+    for (const e of c.events) { const n = STAGE_NO[stageOf(e.kind)]; if (n && !seen.has(n)) seen.set(n, staffColor(e.staff)); }
+    mark = [...seen.keys()].sort().map(n => glyph(n, seen.get(n), 'w dg')).join('');
+  } else if (wideIcon === 'visit' && c.visits.length) {
+    const v = [...c.visits].sort((a, b) => (b.date || 0) - (a.date || 0))[0];
+    mark = glyph(v.staff === STORE_STAFF ? '来' : '訪', staffColor(v.staff), 'w');
+  }
+  const pin = wideIcon === 'catalog'
+    ? (c.catalog ? `<span class="lb-pin" style="background:${staffColor(c.catalog)}"></span>` : STAR)
+    : `<span class="lb-pin" style="background:${colorOf(dim, c.vals[dim])}"></span>`;
+  return `<div class="lab${selected === c.code ? ' sel' : ''}"><div class="lb-left"><div class="r"></div><div class="r">${mark}</div><div class="r"></div></div>${pin}</div>`;
+}
+$('#wideSel').value = wideIcon;
+$('#wideSel').addEventListener('change', e => {
+  wideIcon = e.target.value;
+  try { localStorage.setItem('yame-wide', wideIcon); } catch {}
+  refresh();
+});
+const labelMode = () => map.getZoom() >= LABEL_ZOOM;
+const iconMode = () => labelMode() || wideIcon !== 'dot';
+function renderLabels() {
+  labelLayer.clearLayers();
+  if (!iconMode()) return;
+  const full = labelMode();
+  const b = map.getBounds().pad(full ? 0.25 : 0.1);
+  let n = 0;
+  for (const c of customers.values()) {
+    if (c.lat == null || !passes(c) || !b.contains([c.lat, c.lng])) continue;
+    if (++n > (full ? 800 : 3000)) break;
+    L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'lab-wrap', html: full ? labelHTML(c) : wideHTML(c), iconSize: [0, 0] }),
+      zIndexOffset: selected === c.code ? 2000 : c.rank === 'S' ? 500 : 0, keyboard: false })
+      .on('click', ev => { L.DomEvent.stopPropagation(ev); select(c.code, false); }).addTo(labelLayer);
+  }
+}
+function renderLogoToggles() {
+  $('#logoToggles').innerHTML = LOGOS.map(l =>
+    `<label class="chip logo-chip"><input type="checkbox" id="logo-${l.k}" data-logo="${l.k}"${show[l.k] ? ' checked' : ''}>${esc(l.label)}</label>`).join('');
+  const st = n => staffColor(n);
+  const row = (ic, txt) => `<div class="keyrow"><span class="ic">${ic}</span><span>${txt}</span></div>`;
+  const dummy = { date: new Date(TODAY.getFullYear() - 20, 0, 1) }, fresh = { date: TODAY };
+  $('#logoKey').innerHTML =
+    row(['A','B','C','D','E'].map(v => glyph(v, DIMS.rfm.colors[v], 'k')).join(''), 'RFMランク') +
+    row(glyph('S', '#2346f0', 'k'), '顧客ランクS') +
+    row('<i class="lb-dash"></i><i class="lb-b lb-sora">空</i>', 'RFMが「-」／データなし') +
+    row(`<span class="kpin" style="background:${st('ト')}"></span><span class="kpin" style="background:${st('タ')}"></span><span class="kpin" style="background:${st('テ')}"></span><span class="kpin" style="background:${st('ヤ')}"></span><span class="kstar">${STAR}</span>`, 'お店誌の担当（★はお店誌なし）') +
+    row(box('炊', fresh, '炊飯器') + box('炊', dummy, '炊飯器'), '炊飯器　水色＝8年以上で案内OK・赤＝8年未満で案内NG') +
+    row(box('レ', fresh, 'レンジ') + box('レ', dummy, 'レンジ'), 'レンジ　水色＝10年以上で案内OK・赤＝10年未満で案内NG') +
+    row(box('IH', fresh, 'IH') + box('IH', dummy, 'IH'), 'IH　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
+    row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（所有を目視で確認）') +
+    row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
+    row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）') +
+    '<div>地図を拡大すると（お店ボタンの倍率くらい）アイコン付きで表示します。</div>';
+}
+document.addEventListener('change', e => {
+  const k = e.target.dataset?.logo; if (!k) return;
+  show[k] = e.target.checked;
+  try { localStorage.setItem('yame-logos2', JSON.stringify(show)); } catch {}
+  renderLabels();
+});
+map.on('zoomend', () => refresh());
+map.on('moveend', () => { if (iconMode()) renderLabels(); });
+
+function passes(c, except) {
+  if (query && !c.search.includes(query)) return false;
+  for (const k in DIMS) if (k !== except && hidden[k].has(c.vals[k])) return false;
+  return true;
+}
+function styleFor(c) {
+  const sel = selected === c.code;
+  const isS = c.rank === 'S';
+  return { radius: sel ? 11 : isS ? 8.5 : 7, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
+    color: sel ? css('--ink') : isS ? '#b07d00' : css('--pin-stroke'), weight: sel ? 3 : isS ? 3 : 1.5, renderer };
+}
+function rebuild(fit) {
+  for (const m of markers.values()) map.removeLayer(m);
+  markers = new Map();
+  for (const c of customers.values()) {
+    if (c.lat == null) continue;
+    const m = L.circleMarker([c.lat, c.lng], styleFor(c));
+    m.on('click', () => select(c.code, false));
+    m.bindTooltip(esc(c.name || c.code), { direction: 'top', offset: [0, -6] });
+    markers.set(c.code, m);
+  }
+  selected = null; $('#card').hidden = true;
+  renderDataState(); renderDimSelect(); renderLogoToggles(); refresh();
+  if (fit) fitAll();
+}
+function refresh() {
+  let shown = 0;
+  for (const c of customers.values()) {
+    const m = markers.get(c.code); if (!m) continue;
+    const ok = passes(c);
+    if (ok) shown++;
+    if (ok && !iconMode()) { m.setStyle(styleFor(c)); if (!map.hasLayer(m)) m.addTo(map); }
+    else if (map.hasLayer(m)) map.removeLayer(m);
+  }
+  renderLabels();
+  const sel = selected && markers.get(selected); if (sel && map.hasLayer(sel)) sel.bringToFront();
+  $('#shown').textContent = shown.toLocaleString();
+  $('#total').textContent = customers.size.toLocaleString();
+  $('#openPanel').textContent = `一覧 ${shown}`;
+  renderLegend(); renderFilters(); renderList();
+}
+function fitAll() {
+  const pts = [...customers.values()].filter(c => c.lat != null && passes(c)).map(c => [c.lat, c.lng]);
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.08), { maxZoom: 16 });
+}
+
+/* ---------- side panel / legend ---------- */
+function valuesFor(k) {
+  const counts = new Map();
+  for (const c of customers.values()) if (passes(c, k)) counts.set(c.vals[k], (counts.get(c.vals[k]) || 0) + 1);
+  const all = new Set([...customers.values()].map(c => c.vals[k]));
+  const order = DIMS[k].order.filter(v => all.has(v)).concat([...all].filter(v => !DIMS[k].order.includes(v)).sort());
+  return order.map(v => ({ v, n: counts.get(v) || 0 }));
+}
+function chipHTML(k, v, n) {
+  const off = hidden[k].has(v);
+  return `<button type="button" class="chip${off ? ' off' : ''}" data-k="${k}" data-v="${esc(v)}" aria-pressed="${!off}">
+    <span class="dot" style="background:${colorOf(k, v)}"></span>${esc(v)}<span class="n">${n}</span></button>`;
+}
+function renderLegend() {
+  $('#legend').innerHTML = `<span class="lt">${esc(DIMS[dim].label)}</span>` + valuesFor(dim).map(x => chipHTML(dim, x.v, x.n)).join('');
+}
+function renderFilters() {
+  $('#filters').innerHTML = Object.keys(DIMS).map(k =>
+    `<div class="fgroup"><div class="t">${esc(DIMS[k].label)}</div><div class="chips">${valuesFor(k).map(x => chipHTML(k, x.v, x.n)).join('')}</div></div>`).join('');
+}
+function renderDimSelect() {
+  $('#dim').innerHTML = Object.keys(DIMS).map(k => `<option value="${k}"${k === dim ? ' selected' : ''}>${esc(DIMS[k].label)}</option>`).join('');
+}
+function renderList() {
+  const list = [...customers.values()].filter(c => passes(c));
+  list.sort((a, b) => (a.name || a.code).localeCompare(b.name || b.code, 'ja'));
+  const max = 300;
+  $('#list').innerHTML = list.slice(0, max).map(c =>
+    `<li data-code="${esc(c.code)}"><span class="dot" style="background:${colorOf(dim, c.vals[dim])}"></span><span class="nm">${esc(c.name || '（名称なし）')}</span><span class="sub">${esc(c.vals[dim])}${c.lat == null ? '・座標なし' : ''}</span></li>`).join('');
+  $('#listMore').textContent = list.length > max ? `ほか ${list.length - max} 件。検索や絞り込みで減らすと全部出ます。` : list.length ? '' : '条件に合う顧客がいません。';
+}
+function renderDataState() {
+  $('#dataState').innerHTML = isSample
+    ? `<span class="sample-tag">見本データ</span> 架空の${customers.size}人を表示中です。実在の顧客ではありません。`
+    : `読み込み済み：${sources.map(esc).join('、')}`;
+  if (tileFailed) $('#dataState').innerHTML += '<br>背景の地図を読み込めていません。インターネットにつながっているか確認するか、地図左上で地図の種類を変えてみてください。';
+}
+
+/* ---------- customer card ---------- */
+function select(code, pan) {
+  selected = code;
+  const c = customers.get(code); if (!c) return;
+  refresh();
+  const badge = (k, txt) => `<span class="badge" style="background:${colorOf(k, c.vals[k])}">${esc(txt)}</span>`;
+  const applRows = ['炊飯器', 'レンジ', 'IH'].concat(Object.keys(c.appl).filter(k => !['炊飯器', 'レンジ', 'IH'].includes(k))).map(cat => {
+    const a = currentAppliance(c, cat);
+    if (!a) return `<span class="k">${esc(cat)}</span><span class="m">所有情報なし</span><span></span>`;
+    const b = bucketOf(yearsSince(a.date));
+    const seen = a.maru ? '<br>○ 所有を目視で確認' : '';
+    const info = a.date ? `${esc(a.model)}<br>${fmtDate(a.date)} 納品${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
+    const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
+    return `<span class="k">${esc(cat)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${ageCol(cat, a)};color:${ageCol(cat, a) === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
+  }).join('');
+  const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
+    `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
+  const q = c.lat != null ? `${c.lat},${c.lng}` : encodeURIComponent(c.addr);
+  $('#card').innerHTML = `
+    <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}</div>
+      <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff || '未接点')}${badge('stage', c.stage)}${badge('visit', c.vals.visit)}</div></div>
+      <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
+    <div class="bd">
+      <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
+        <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
+      <div class="blk"><h3>調理家電（所有年数）</h3><div class="appl">${applRows}</div></div>
+      <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
+      <div class="blk"><h3>訪問確認（${c.visits.length}件）</h3>${hist(c.visits, 'まだ訪問の記録はありません')}</div>
+    </div>`;
+  $('#card').hidden = false;
+  $('#closeCard').onclick = closeCard;
+  $('#panel').classList.remove('open');
+  // keep the chosen pin visible beside (PC) or above (phone) the card
+  if (c.lat != null && (pan || innerWidth <= 860)) {
+    const z = pan ? Math.max(map.getZoom(), 16) : map.getZoom();
+    const off = innerWidth <= 860 ? L.point(0, $('#card').offsetHeight / 2) : L.point(190, 0);
+    map.setView(map.unproject(map.project([c.lat, c.lng], z).add(off), z), z, { animate: false });
+  }
+}
+function closeCard() { selected = null; $('#card').hidden = true; refresh(); }
+
+/* ---------- events ---------- */
+let toastT;
+function toast(msg, ms = 3500) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (chip) { const { k, v } = chip.dataset; hidden[k].has(v) ? hidden[k].delete(v) : hidden[k].add(v); refresh(); return; }
+  const li = e.target.closest('#list li');
+  if (li) select(li.dataset.code, true);
+});
+$('#dim').addEventListener('change', e => { dim = e.target.value; refresh(); if (selected) select(selected, false); });
+$('#search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); refresh(); });
+$('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
+$('#loadBtn').addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => { importFiles([...e.target.files]); e.target.value = ''; });
+$('#sampleBtn').addEventListener('click', () => { makeSample(); rebuild(true); toast('見本データに戻しました'); });
+$('#fitBtn').addEventListener('click', fitAll);
+$('#zin').addEventListener('click', () => map.zoomIn());
+$('#zout').addEventListener('click', () => map.zoomOut());
+$('#storeBtn').addEventListener('click', () => map.setView([STORE.lat, STORE.lng], 16));
+$('#openPanel').addEventListener('click', () => { $('#panel').classList.add('open'); });
+$('#closePanel').addEventListener('click', () => $('#panel').classList.remove('open'));
+map.on('click', () => { if (selected) closeCard(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCard(); $('#panel').classList.remove('open'); } });
+// dragging files onto the page (PC)
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer?.files?.length) importFiles([...e.dataTransfer.files]); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', refresh);
+new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+makeSample();
+rebuild(true);
+})();
+</script>
+
+</body></html>
