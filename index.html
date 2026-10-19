@@ -771,7 +771,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
       <div id="odBox" hidden></div>
       <input id="file" type="file" accept=".csv,.xlsx,.xls,.txt" multiple hidden>
-      <div>店クラウドVのCSVや編集したExcelを何本でも選べます。顧客コードで1人1本のピンにまとめます。ファイルはこの端末の中だけで読み込み、外へ送りません。</div>
+      <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
+      <div id="csvNote">店クラウドVのCSVや編集したExcelを何本でも選べます。顧客コードで1人1本のピンにまとめます。ファイルはこの端末の中だけで読み込み、外へ送りません。</div>
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
@@ -1413,7 +1414,9 @@ function renderList() {
   $('#listMore').textContent = list.length > max ? `ほか ${list.length - max} 件。検索や絞り込みで減らすと全部出ます。` : list.length ? '' : '条件に合う顧客がいません。';
 }
 function renderDataState() {
-  $('#dataState').innerHTML = isSample
+  $('#dataState').innerHTML = !isSample && !customers.size
+    ? 'サインインすると、最新のお客様データが地図に表示されます。'
+    : isSample
     ? `<span class="sample-tag">見本データ</span> 架空の${customers.size}人を表示中です。実在の顧客ではありません。`
     : `${savedAt ? `${fmtDate(savedAt)} ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')} に読み込んだデータ（この端末に保存中）<br>` : ''}読み込み済み：${sources.map(esc).join('、')}`;
   if (tileFailed) $('#dataState').innerHTML += '<br>背景の地図を読み込めていません。インターネットにつながっているか確認するか、地図左上で地図の種類を変えてみてください。';
@@ -1487,6 +1490,57 @@ const OD = {
 };
 function openPanelIfPhone() { $('#panel').classList.add('open'); }
 const odReady = () => OD.client && OD.tenant && location.origin + location.pathname === OD.redirect;
+// only the owner (matched by account hash) gets the data buttons; everyone else signs in and just sees the latest map.
+// This only shapes the screen: what anyone can read is decided by their OneDrive sharing.
+const OWNER_HASH = 3959182474;
+const backFromLogin = /[?&](code|error)=/.test(location.search);
+let role = null;
+try { role = JSON.parse(localStorage.getItem('yame-role') || 'null'); } catch {}
+const viewerMode = () => odReady() && role !== 'owner';
+function applyRole() {
+  const v = viewerMode();
+  $('#loadBtn').parentElement.hidden = v;
+  $('#odBtn').parentElement.hidden = v;
+  $('#csvNote').hidden = v;
+  $('#viewRow').hidden = !v;
+  if (v) $('#odBox').hidden = true;
+}
+const DEFAULT_SKIP = /^【|4月1日から/;
+const isDataFile = i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name);
+async function odDownload(list) {
+  const got = [];
+  for (const f of list) {
+    const r = await fetch(f['@microsoft.graph.downloadUrl']);
+    if (!r.ok) throw new Error(`${f.name} をダウンロードできませんでした`);
+    got.push(new File([await r.blob()], f.name));
+  }
+  return got;
+}
+async function odWhoAmI(token) {
+  const me = await graph('/me?$select=userPrincipalName', token);
+  role = fnv(String(me.userPrincipalName || '').toLowerCase()) === OWNER_HASH ? 'owner' : 'viewer';
+  lsSet('yame-role', role);
+  applyRole(); renderDataState();
+}
+async function odViewerLoad(auto) {
+  const btn = $('#viewBtn');
+  try {
+    const token = await odToken();
+    if (!token) { if (!auto) { lsSet('yame-od-pending', true); await odLogin(); } return; }
+    if (!role) await odWhoAmI(token);
+    if (role === 'owner') return;
+    btn.disabled = true; btn.textContent = '最新のデータを読み込み中…';
+    const files = (await odFolderChildren(token)).filter(isDataFile).filter(f => !DEFAULT_SKIP.test(f.name));
+    if (!files.length) throw new Error('共有フォルダにデータが見つかりませんでした');
+    const got = await odDownload(files);
+    freshNext = true;
+    await importFiles(got);
+  } catch (e) {
+    toast(e.message, 8000);
+    if (e.status === 401) lsSet('yame-od-tok', null);
+  } finally { btn.disabled = false; btn.textContent = '最新のお客様データを表示'; }
+}
+$('#viewBtn').addEventListener('click', () => odViewerLoad(false));
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
 const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -1524,7 +1578,7 @@ const encPath = p => p.split('/').map(encodeURIComponent).join('/');
 async function odFolderChildren(token) {
   try { return (await graph(`/me/drive/root:/${encPath(OD.folder)}:/children?$top=200`, token)).value; }
   catch (e) {
-    if (e.status !== 404) throw e;
+    if (e.status === 401) throw e;   // guests have no OneDrive of their own, so any other failure means "look in shared folders"
     // the folder lives in someone else's OneDrive (shared with me / shortcut): find the shared folder that is part of the path
     const seg = OD.folder.split('/');
     // the azyame folder is shared from the az-yame account's OneDrive: open it by its web address
@@ -1614,8 +1668,11 @@ $('#odBtn').addEventListener('click', () => {
   if (q.has('error')) { toast('サインインできませんでした：' + (q.get('error_description') || q.get('error')), 8000); return; }
   if (!p || p.state !== q.get('state') || !odReady()) return;
   try {
-    await odTokenRequest({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: p.verifier });
-    if (lsGet('yame-od-pending')) { lsSet('yame-od-pending', null); openPanelIfPhone(); odShowList(); }
+    const tok = await odTokenRequest({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: p.verifier });
+    await odWhoAmI(tok.access);
+    const pending = lsGet('yame-od-pending'); lsSet('yame-od-pending', null);
+    if (role === 'owner') { if (pending) { openPanelIfPhone(); odShowList(); } }
+    else odViewerLoad(false);
   } catch (e) { toast(e.message, 8000); }
 })();
 $('#sampleBtn').addEventListener('click', () => { makeSample(); savedAt = null; clearData(); rebuild(true); toast('見本データに戻しました（覚えていたデータも消しました）'); });
@@ -1654,12 +1711,16 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', refresh)
 new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 makeSample();
+applyRole();
+if (viewerMode()) { customers = new Map(); sources = []; isSample = false; }   // people I share with see real data or nothing, never the sample
 rebuild(true);
 loadData().then(d => {
-  if (!d || !(d.customers instanceof Map) || !d.customers.size || !isSample) return;
-  customers = d.customers; sources = d.sources || []; savedAt = d.savedAt || null; isSample = false;
-  finalize(); rebuild(true);
-  toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
+  if (d && d.customers instanceof Map && d.customers.size && (isSample || !customers.size)) {
+    customers = d.customers; sources = d.sources || []; savedAt = d.savedAt || null; isSample = false;
+    finalize(); rebuild(true);
+    toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
+  }
+  if (viewerMode() && !backFromLogin) odViewerLoad(true);   // refresh to the latest when already signed in
 });
 })();
 </script>
