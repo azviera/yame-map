@@ -644,7 +644,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #recForm .seg label{flex-direction:row;align-items:center;gap:6px;font-weight:400;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 #recForm .seg input{height:auto}
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
-#recForm .applOnly[hidden]{display:none}
+#recForm .applOnly[hidden],#recForm .exOnly[hidden]{display:none}
+#recForm .exOnly{display:flex;flex-direction:column;gap:6px}
+.acheck{margin-left:6px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);cursor:pointer}
 /* our own date text (the browser's date box showed an empty weekday); the real input sits invisibly on top so a tap opens its picker */
 .datepick{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
 .datepick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
@@ -878,6 +880,15 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <label>担当者<select name="staff"><option>ト</option><option>タ</option><option>テ</option><option>ヤ</option><option>ミ</option></select></label>
     </div>
     <div class="applOnly">
+      <div class="exOnly" hidden>
+        <div id="rfOrig" class="recstate"></div>
+        <div class="seg">
+          <label><input type="radio" name="status" value="使用中">今も使っている</label>
+          <label><input type="radio" name="status" value="処分済み">処分・買い替え済み</label>
+          <label><input type="radio" name="status" value="譲渡">譲った・贈答した</label>
+        </div>
+      </div>
+      <input type="hidden" name="origModel"><input type="hidden" name="origDate">
       <div class="two">
         <label>家電<select name="appl"><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>その他</option></select></label>
         <label>メーカー<input name="maker" list="rfMakers"></label>
@@ -993,7 +1004,7 @@ try { const v = localStorage.getItem('yame-check-since'); if (v) checkSince = ne
 const checkedOn = a => { const d = a.checked || a.disposed || null; return a.recChecked && (!d || a.recChecked > d) ? a.recChecked : d; };   // recChecked: 所有確認 entered on the map
 const isMaru = a => !!a.maru || (!!checkedOn(a) && (!checkSince || checkedOn(a) >= checkSince));
 function currentAppliance(c, cat) {
-  const list = (c.appl[cat] || []).filter(a => a.date || a.over != null);
+  const list = (c.appl[cat] || []).filter(a => (a.date || a.over != null) && !a.recGone);   // recGone: 処分・譲渡 recorded on the map
   list.sort((a, b) => (b.date || 0) - (a.date || 0));
   return list[0] || null;
 }
@@ -1623,11 +1634,13 @@ function select(code, pan) {
     const b = bucketOf(yearsSince(a.date));
     const seen = checkedOn(a) ? `<br>${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '<br>○ 所有を目視で確認' : '';
     // 他店 purchases are registered on 1 January of the year made (the shop never sells on 1/1)
-    const when = !a.date ? '' : a.store === '他店' ? (a.date.getMonth() === 0 && a.date.getDate() === 1 ? `他店・${a.date.getFullYear()}年製` : `他店・${fmtDate(a.date)}`) : `${fmtDate(a.date)} 納品`;
+    const jan1 = a.date && a.date.getMonth() === 0 && a.date.getDate() === 1;
+    const when = !a.date ? '' : (a.store === '他店' ? '他店・' : '') + (jan1 ? `${a.date.getFullYear()}年製` : a.store === '他店' ? fmtDate(a.date) : `${fmtDate(a.date)} 納品`);
     const info = a.date ? `${esc(a.model)}<br>${when}${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
-    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
+    const chk = a.fromRec ? '' : `<button type="button" class="acheck" data-acheck="${esc(cat)}">確認・変更</button>`;
+    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}${chk}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
   }).join('');
   const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
@@ -1932,7 +1945,10 @@ function computeRecords() {
 function applyRecords() {
   for (const c of customers.values()) {
     c.visits = c.visits.filter(v => !v.fromRec);
-    for (const k in c.appl) { c.appl[k] = c.appl[k].filter(a => !a.fromRec); for (const a of c.appl[k]) delete a.recChecked; }
+    for (const k in c.appl) {
+      c.appl[k] = c.appl[k].filter(a => !a.fromRec);
+      for (const a of c.appl[k]) { if (a._o) Object.assign(a, a._o); delete a._o; delete a.recChecked; delete a.recGone; }
+    }
     if ('_cat0' in c) { c.catalog = c._cat0; c.catalogTarget = c._ct0; delete c._cat0; delete c._ct0; }
   }
   const { recs } = computeRecords();
@@ -1946,9 +1962,21 @@ function applyRecords() {
     } else if (r.kind === '所有確認') {
       const cat = r.appl === '熱源' ? 'IH' : r.appl;
       const list = (c.appl[cat] ||= []);
-      const m = normQ(r.model);
-      const same = m && list.find(a => !a.fromRec && normQ(a.model) === m);
-      if (same) same.recChecked = d;
+      // an appliance already on file (opened with 確認・変更) is matched by its original 型式 and 納品日; a new find by 型式
+      const isEx = !!(r.origModel || r.origDate);
+      const m = normQ(isEx ? r.origModel : r.model);
+      const same = list.find(a => !a.fromRec && (isEx ? normQ(a.model) === m && fmtDate(a.date) === (r.origDate || '') : m && normQ(a.model) === m))
+        || (isEx && m && list.find(a => !a.fromRec && normQ(a.model) === m));
+      if (same && r.status && r.status !== '使用中') same.recGone = d;
+      else if (same) {
+        same.recChecked = d;
+        if (isEx) {   // details corrected on the map show at once (店クラウドV is fixed later from the CSV)
+          same._o ||= { model: same.model, date: same.date, place: same.place, store: same.store };
+          if (r.model) same.model = r.model;
+          if (r.year && (r.store === '他店' || !same.date || same.date.getFullYear() !== +r.year)) same.date = new Date(+r.year, 0, 1);
+          same.place = r.place || ''; if (r.store) same.store = r.store;
+        }
+      } else if (r.status && r.status !== '使用中') { /* 処分 of something not on file: nothing to show */ }
       else list.push({ model: r.model || '', date: r.year ? new Date(+r.year, 0, 1) : null, place: r.place || '', store: r.store || '', checked: d, maru: false, fromRec: true });
     }
   }
@@ -1961,7 +1989,7 @@ function recListHTML(code) {
   const pend = new Set(recPending.filter(e => e.op === 'put').map(e => e.rec.id));
   if (!list.length) return '<div class="empty" style="margin-top:6px">この地図からの記録はまだありません</div>';
   return `<ul class="reclist">${list.map(r => {
-    const what = r.kind === '所有確認' ? `${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
+    const what = r.kind === '所有確認' ? `${r.status ? '【' + esc(r.status) + '】' : '【新しく見つけた】'}${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
     const tags = (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
     const ops = r.writer === writerId ? `<span class="ops"><button type="button" data-redit="${esc(r.id)}">直す</button><button type="button" data-rdel="${esc(r.id)}">消す</button></span>` : '';
     return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
@@ -2047,23 +2075,37 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 // the entry form
 let recEditing = null;
-function openRecForm(kind, code, rec) {
+// ex: an appliance already on file ({ cat, a }), opened with its 確認・変更 button
+function openRecForm(kind, code, rec, ex) {
   const c = customers.get(code); if (!c) return;
   recEditing = { code, id: rec ? rec.id : null };
   const f = $('#recForm form');
   f.reset();
-  $('#rfTitle').textContent = rec ? '記録を直す' : '記録をつける';
+  f.elements.origModel.value = ''; f.elements.origDate.value = '';   // reset() keeps hidden inputs' last values
+  const base = { kind, date: isoDay(new Date()), staff: lsGet('yame-rec-staff') || 'ト' };
+  if (ex) {
+    const a = ex.a, jan1 = a.date && a.date.getMonth() === 0 && a.date.getDate() === 1;
+    Object.assign(base, { kind: '所有確認', status: '使用中', appl: ex.cat === 'IH' ? '熱源' : ex.cat, model: a.model || '',
+      year: a.store === '他店' && jan1 ? String(a.date.getFullYear()) : '', place: a.place || '', store: a.store || '',
+      origModel: a.model || '', origDate: fmtDate(a.date) || '' });
+  }
+  const v = rec || base;
+  $('#rfTitle').textContent = rec ? '記録を直す' : ex ? '持っている家電の確認・変更' : '記録をつける';
   $('#rfWho').textContent = `${c.name || '（名称なし）'}（顧客コード ${c.code}）`;
-  const v = rec || { kind, date: isoDay(new Date()), staff: lsGet('yame-rec-staff') || 'ト' };
   for (const el of f.elements) {
     if (!el.name) continue;
-    if (el.type === 'radio') el.checked = el.value === v.kind;
+    if (el.type === 'radio') el.checked = el.value === v[el.name];
     else if (v[el.name] != null) el.value = v[el.name];
   }
+  $('#rfOrig').textContent = v.origModel || v.origDate ? `登録済み：${v.appl} ${v.origModel || '（型式なし）'}${v.origDate ? '・' + v.origDate : ''}　違っていれば下で直してください` : '';
   showApplFields();
   $('#recForm').hidden = false;
 }
-function showApplFields() { $('#recForm .applOnly').hidden = $('#recForm form').elements.kind.value !== '所有確認'; }
+function showApplFields() {
+  const f = $('#recForm form');
+  $('#recForm .applOnly').hidden = f.elements.kind.value !== '所有確認';
+  $('#recForm .exOnly').hidden = !(f.elements.origModel.value || f.elements.origDate.value);
+}
 $('#rfKind').addEventListener('change', showApplFields);
 $('#rfCancel').addEventListener('click', () => { $('#recForm').hidden = true; });
 $('#recForm').addEventListener('click', e => { if (e.target.id === 'recForm') $('#recForm').hidden = true; });
@@ -2076,14 +2118,17 @@ $('#recForm form').addEventListener('submit', e => {
     memo: f.elements.memo.value.trim(), writer: writerId, at: new Date().toISOString() };
   if (kind === '所有確認') Object.assign(rec, { appl: f.elements.appl.value, maker: f.elements.maker.value.trim(), model: f.elements.model.value.trim().normalize('NFKC').toUpperCase(),
     year: f.elements.year.value, place: f.elements.place.value.trim(), store: f.elements.store.value });
+  if (kind === '所有確認' && (f.elements.origModel.value || f.elements.origDate.value))
+    Object.assign(rec, { status: f.elements.status.value || '使用中', origModel: f.elements.origModel.value, origDate: f.elements.origDate.value });
   lsSet('yame-rec-staff', rec.staff);
   $('#recForm').hidden = true;
   recAdd({ op: 'put', rec });
   toast('記録しました', 2000);
 });
 $('#card').addEventListener('click', e => {
-  const b = e.target.closest('[data-rec],[data-redit],[data-rdel]'); if (!b || !selected) return;
-  if (b.dataset.rec) openRecForm(b.dataset.rec, selected);
+  const b = e.target.closest('[data-rec],[data-redit],[data-rdel],[data-acheck]'); if (!b || !selected) return;
+  if (b.dataset.acheck) { const a = currentAppliance(customers.get(selected), b.dataset.acheck); if (a) openRecForm('所有確認', selected, null, { cat: b.dataset.acheck, a }); }
+  else if (b.dataset.rec) openRecForm(b.dataset.rec, selected);
   else if (b.dataset.redit) openRecForm(null, selected, computeRecords().recs.get(b.dataset.redit));
   else if (b.dataset.rdel && confirm('この記録を消しますか？')) recAdd({ op: 'del', recId: b.dataset.rdel });
 });
@@ -2096,10 +2141,23 @@ $('#recExportGo').addEventListener('click', () => {
   const rows = [...recs.values()].filter(r => !onlyNew || !done.has(r.id))
     .sort((a, b) => (a.date === b.date ? (a.code < b.code ? -1 : 1) : a.date < b.date ? -1 : 1));
   if (!rows.length) { toast('書き出す記録がありません', 3000); return; }
-  const head = ['日付', '顧客コード', '顧客名', '担当者', '内容', '家電', 'メーカー', '型式(品番)', '製造年', '設置場所', '自店・他店', '確認日(廃棄日付)', 'メモ', '記録ID', '入力済み'];
+  // 区分 tells 既存の確認 (an appliance already in 店クラウドV) from 新しく見つけた (not registered yet); 店クラウドVでの入力 says what to do with each row
+  const head = ['日付', '顧客コード', '顧客名', '担当者', '内容', '区分', '状態', '家電', 'メーカー', '型式(品番)', '製造年', '設置場所', '自店・他店',
+    '元の型式', '元の納品日', '確認日(廃棄日付)', '店クラウドVでの入力', 'メモ', '記録ID', '入力済み'];
   const q = v => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const lines = [head.join(',')].concat(rows.map(r => [r.date.replace(/-/g, '/'), r.code, r.name, r.staff, r.kind, r.appl, r.maker, r.model, r.year, r.place, r.store,
-    r.kind === '所有確認' ? r.date.replace(/-/g, '/') : '', r.memo, r.id, done.has(r.id) ? '済' : ''].map(q).join(',')));
+  const todo = r => {
+    const d = r.date.replace(/-/g, '/');
+    if (r.kind === '訪問') return '接点に「訪問」を登録';
+    if (r.kind === 'お店誌') return '接点に「お店誌」を登録';
+    if (r.status === '処分済み') return `元の所有を「廃棄」・廃棄日付 ${d}`;
+    if (r.status === '譲渡') return `元の所有を「贈答」・廃棄日付 ${d}`;
+    if (r.status) return `元の所有の廃棄日付に ${d}` + (r.model && normQ(r.model) !== normQ(r.origModel) ? '・型式などを直す' : '');
+    return `所有を新規登録（${r.store === '他店' ? `他店・納品日 ${r.year ? r.year + '/01/01' : '製造年の1/1'}` : r.store || '自店か他店か確認'}）・廃棄日付 ${d}`;
+  };
+  const lines = [head.join(',')].concat(rows.map(r => [r.date.replace(/-/g, '/'), r.code, r.name, r.staff, r.kind,
+    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl, r.maker, r.model, r.year, r.place, r.store,
+    r.origModel, r.origDate, r.kind === '所有確認' && (!r.status || r.status === '使用中') ? r.date.replace(/-/g, '/') : '',
+    todo(r), r.memo, r.id, done.has(r.id) ? '済' : ''].map(q).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `行動記録_${isoDay(new Date()).replace(/-/g, '')}.csv`;
