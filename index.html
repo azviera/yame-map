@@ -646,6 +646,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
+.acount{display:inline-block;margin-top:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:none;color:var(--accent,#1a73e8);cursor:pointer}
+.aunits{margin-top:4px;border-left:3px solid var(--line);padding-left:8px}.aunit{font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line)}.aunit:last-child{border-bottom:0}
+#rfWarn{font-size:12px;color:#b45309;background:#fff7e6;border-radius:6px;padding:6px 8px}#rfWarn:empty{display:none}
 .acheck{margin-left:6px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);cursor:pointer}
 /* our own date text (the browser's date box showed an empty weekday); the real input sits invisibly on top so a tap opens its picker */
 .datepick{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
@@ -836,6 +839,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="range">レンジ</option>
           <option value="ih">熱源</option>
           <option value="tv">テレビ</option>
+          <option value="aircon">エアコン</option>
           <option value="fridge">冷蔵庫</option>
           <option value="washer">洗濯機</option>
           <option value="heater">給湯器</option>
@@ -873,7 +877,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div class="seg" id="rfKind">
       <label><input type="radio" name="kind" value="お店誌">お店誌を渡した</label>
       <label><input type="radio" name="kind" value="訪問">訪問した</label>
-      <label><input type="radio" name="kind" value="所有確認">所有を確認した</label>
+      <label><input type="radio" name="kind" value="所有確認">新しく見つけた家電</label>
     </div>
     <div class="two">
       <label>日付<input type="date" name="date" required></label>
@@ -888,6 +892,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <label><input type="radio" name="status" value="譲渡">譲った・贈答した</label>
         </div>
       </div>
+      <div id="rfWarn"></div>
       <input type="hidden" name="origModel"><input type="hidden" name="origDate">
       <div class="two">
         <label>家電<select name="appl"><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>その他</option></select></label>
@@ -926,7 +931,7 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 /* ---------- colour dimensions ---------- */
 // CP target thresholds, same as the My Maps layers: 炊飯器 8年 / レンジ 10年 / IH 12年
 // 案内 thresholds (years); 冷蔵庫・洗濯機 follow the CP columns of 【毎日③】, テレビ has none there so 10 is a placeholder
-const TH = { '炊飯器':8, 'レンジ':10, 'IH':12, 'テレビ':10, '冷蔵庫':10, '洗濯機':8, '給湯器':15 };
+const TH = { '炊飯器':8, 'レンジ':10, 'IH':12, 'テレビ':10, '冷蔵庫':10, '洗濯機':8, '給湯器':15, 'エアコン':10 };
 const OVER = '#3fd8e8', UNDER = '#e3262b';
 const ageOrder = cat => [`${TH[cat]}年以上`, `${TH[cat]}年未満`, '所有なし'];
 const ageCols = cat => ({ [`${TH[cat]}年以上`]:OVER, [`${TH[cat]}年未満`]:UNDER, '所有なし':GREY });
@@ -952,8 +957,8 @@ function staffFromCustom(s) {
   for (let len = 2; len <= Math.min(8, n.length); len++) { const a = STAFF_HASH[fnv(n.slice(0, len))]; if (a) return a; }
   return /店頭/.test(n) ? STORE_STAFF : '';
 }
-const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', fridge:'冷蔵庫', washer:'洗濯機', heater:'給湯器' };
-const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', '冷蔵庫':'冷', '洗濯機':'洗', '給湯器':'湯' };
+const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', aircon:'エアコン', fridge:'冷蔵庫', washer:'洗濯機', heater:'給湯器' };
+const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', 'エアコン':'エ', '冷蔵庫':'冷', '洗濯機':'洗', '給湯器':'湯' };
 const DIMS = {
   rfm:   { label:'RFMランク', order:['A','B','C','D','E','-','未設定'],
            colors:{A:'#ffe500',B:'#a6ea5c',C:'#f2a23a',D:'#b9997c',E:'#e8402a','-':'#222222','未設定':'#5fe3f0'}, get:c => c.rfm || '未設定' },
@@ -1005,7 +1010,10 @@ try { const v = localStorage.getItem('yame-check-since'); if (v) checkSince = ne
 const checkedOn = a => { const d = a.checked || a.disposed || null; return a.recChecked && (!d || a.recChecked > d) ? a.recChecked : d; };   // recChecked: 所有確認 entered on the map
 const isMaru = a => !!a.maru || (!!checkedOn(a) && (!checkSince || checkedOn(a) >= checkSince));
 function currentAppliance(c, cat) {
-  const list = (c.appl[cat] || []).filter(a => (a.date || a.over != null) && !a.recGone);   // recGone: 処分・譲渡 recorded on the map
+  const all = (c.appl[cat] || []).filter(a => (a.date || a.over != null) && !a.recGone);   // recGone: 処分・譲渡 recorded on the map
+  // the main unit (…1 column) or one found on the map; the other units are listed on the card
+  const main = all.filter(a => a.primary || a.fromRec || a.over != null);
+  const list = main.length ? main : all;
   list.sort((a, b) => (b.date || 0) - (a.date || 0));
   return list[0] || null;
 }
@@ -1040,6 +1048,7 @@ function stageOf(kind) {
 }
 const STAGE_RANK = { '見込み':4, '推進':3, 'チラシ':2, 'その他':1, '接点なし':0 };
 function catOf(prefix) {
+  prefix = prefix.replace(/サブ$/, '');   // 冷蔵庫サブ1 etc. are the same kind of appliance
   if (/炊飯/.test(prefix)) return '炊飯器';
   if (/レンジ|オーブン/.test(prefix)) return 'レンジ';
   if (/IH|ＩＨ|クッキング|コンロ|熱源/i.test(prefix)) return 'IH';
@@ -1099,20 +1108,28 @@ function ingest(rows, fileName) {
     for (const k in row) {
       const m = k.match(/^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他)$/);
       if (!m || m[1] === '顧客') continue;
-      if ((m[2] && m[2] !== '1') || /サブ$/.test(m[1])) continue;   // only the main unit (…1 columns): not テレビ2〜5 or サブ
+      // every unit is kept (テレビ1〜5, 冷蔵庫サブ1…); the …1 column is the main one (newest, メイン first)
       const g = groups[m[1] + m[2]] ||= { cat: catOf(m[1]) };
       const f = m[3].startsWith('品番') ? 'model' : m[3].startsWith('納品') ? 'date' : m[3].startsWith('設置') ? 'place' : m[3] === '自他' ? 'store' : 'disposed';
       g[f] = row[k];
     }
     const dated = new Set();
-    for (const g of Object.values(groups)) {
+    for (const [gname, g] of Object.entries(groups)) {
       const d = parseDate(g.date); const model = String(g.model ?? '').trim();
       if (!d && !model) continue;
-      const key = ['a', g.cat, model, fmtDate(d)].join('|');
+      const key = ['a', gname, model, fmtDate(d)].join('|');
       if (c.keys.has(key)) continue;
       c.keys.add(key);
-      (c.appl[g.cat] ||= []).push({ model, date: d, place: String(g.place ?? '').trim(), store: String(g.store ?? '').trim(), checked: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
+      const sub = /サブ$/.test(gname.replace(/\d+$/, ''));
+      (c.appl[g.cat] ||= []).push({ model, date: d, sub, primary: !sub && /(^|\D)1?$/.test(gname) && !/[2-9]$/.test(gname), place: String(g.place ?? '').trim(), store: String(g.store ?? '').trim(), checked: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
       if (d) dated.add(g.cat);
+    }
+    // how many of each the customer has in 店クラウドV (テレビ台数 / テレビ自店 / テレビ他店), including units beyond the columns
+    for (const k in row) {
+      const m = k.match(/^(テレビ|エアコン|冷蔵庫|洗濯機|レンジ|炊飯器|コンロ熱源|給湯器)(台数|自店|他店)$/);
+      if (!m) continue;
+      const o = ((c.cnt ||= {})[catOf(m[1])] ||= {});
+      o[m[2] === '台数' ? 'n' : m[2] === '自店' ? 'own' : 'other'] = +row[k] || 0;
     }
     // カスタム like "8年以上○": ○ = ownership confirmed by eye; no delivery date needed
     const am = custom.match(/(\d+)\s*年\s*(以上|未満)/);
@@ -1176,7 +1193,7 @@ function arraysToObjects(arr) {
   // keep only the columns the map uses (the ownership file has 233; this makes reading it much faster)
   const keep = head.map((k, i) => [k.replace(/[\s　]/g, ''), i]).filter(([k]) => k && (
     /顧客コード|顧客CD|顧客番号|顧客名|氏名|住所|座標|緯度|経度|ランク|RFM|担当|接点|訪問|カスタム|結合|電話|TEL|携帯/i.test(k) ||
-    (/^(.+?)(1?)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他)$/.test(k) && !/サブ\d|[2-9]\d*(品番|納品|設置|廃棄|自他)/.test(k))));
+    /^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他)$/.test(k) || /^(テレビ|エアコン|冷蔵庫|洗濯機|レンジ|炊飯器|コンロ熱源|給湯器)(台数|自店|他店)$/.test(k)));
   const out = [];
   for (let j = h + 1; j < arr.length; j++) {
     const r = arr[j];
@@ -1378,7 +1395,7 @@ const LABEL_ZOOM = 15;
 const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
   { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
-  { k:'ih', label:'熱源' }, { k:'tv', label:'テレビ' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' }, { k:'heater', label:'給湯器' },
+  { k:'ih', label:'熱源' }, { k:'tv', label:'テレビ' }, { k:'aircon', label:'エアコン' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' }, { k:'heater', label:'給湯器' },
   { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
 ];
 const show = Object.fromEntries(LOGOS.map(l => [l.k, true]));
@@ -1397,7 +1414,7 @@ function catalogPin(c) {
   return '';                          // not a お店誌 target: no mark
 }
 function labelHTML(c) {
-  const row0 = [['tv','テ','テレビ'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
+  const row0 = [['tv','テ','テレビ'],['aircon','エ','エアコン'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
     const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
   }).join('');
   const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','熱','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
@@ -1501,6 +1518,7 @@ function renderLogoToggles() {
     row(box('レ', fresh, 'レンジ') + box('レ', dummy, 'レンジ'), 'レンジ　水色＝10年以上で案内OK・赤＝10年未満で案内NG') +
     row(box('熱', fresh, 'IH') + box('熱', dummy, 'IH'), '熱源（IH）　水色＝12年以上で案内OK・赤＝12年未満で案内NG') +
     row(box('テ', fresh, 'テレビ') + box('テ', dummy, 'テレビ'), 'テレビ　水色＝10年以上・赤＝10年未満（一番上の段）') +
+    row(box('エ', fresh, 'エアコン') + box('エ', dummy, 'エアコン'), 'エアコン　水色＝10年以上・赤＝10年未満（一番上の段）') +
     row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
     row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
     row(box('湯', fresh, '給湯器') + box('湯', dummy, '給湯器'), '給湯器　水色＝15年以上・赤＝15年未満（ランクの右隣）') +
@@ -1628,20 +1646,32 @@ function select(code, pan) {
   const c = customers.get(code); if (!c) return;
   refresh();
   const badge = (k, txt) => `<span class="badge" style="background:${colorOf(k, c.vals[k])}">${esc(txt)}</span>`;
-  const applRows = ['炊飯器', 'レンジ', 'IH'].concat(Object.keys(c.appl).filter(k => !['炊飯器', 'レンジ', 'IH'].includes(k))).map(cat => {
+  // 他店 purchases are registered on 1 January of the year made (the shop never sells on 1/1)
+  const whenOf = a => {
+    const jan1 = a.date && a.date.getMonth() === 0 && a.date.getDate() === 1;
+    return !a.date ? '' : (a.store === '他店' ? '他店・' : '') + (jan1 ? `${a.date.getFullYear()}年製` : a.store === '他店' ? fmtDate(a.date) : `${fmtDate(a.date)} 納品`);
+  };
+  const seenOf = a => checkedOn(a) ? `${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '○ 所有を目視で確認' : '';
+  const chkBtn = (cat, a) => a.fromRec ? '' : `<button type="button" class="acheck" data-acheck="${esc(cat)}|${c.appl[cat].indexOf(a)}">確認・変更</button>`;
+  const ORDER = ['炊飯器', 'レンジ', 'IH', '給湯器', 'テレビ', 'エアコン', '冷蔵庫', '洗濯機'];
+  const applRows = ORDER.filter(k => ORDER.indexOf(k) < 3 || c.appl[k] || (c.cnt && c.cnt[k] && c.cnt[k].n))
+    .concat(Object.keys(c.appl).filter(k => !ORDER.includes(k))).map(cat => {
     const a = currentAppliance(c, cat);
     const catName = cat === 'IH' ? '熱源' : cat;
-    if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし</span><span></span>`;
-    const b = bucketOf(yearsSince(a.date));
-    const seen = checkedOn(a) ? `<br>${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '<br>○ 所有を目視で確認' : '';
-    // 他店 purchases are registered on 1 January of the year made (the shop never sells on 1/1)
-    const jan1 = a.date && a.date.getMonth() === 0 && a.date.getDate() === 1;
-    const when = !a.date ? '' : (a.store === '他店' ? '他店・' : '') + (jan1 ? `${a.date.getFullYear()}年製` : a.store === '他店' ? fmtDate(a.date) : `${fmtDate(a.date)} 納品`);
-    const info = a.date ? `${esc(a.model)}<br>${when}${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
+    // how many: 店クラウドV's count (it also covers units beyond the columns), else what the map holds
+    const units = (c.appl[cat] || []).filter(u => (u.date || u.model) && !u.recGone);
+    const cn = (c.cnt && c.cnt[cat]) || null;
+    const n = Math.max(cn ? cn.n || 0 : 0, units.length);
+    const cntTxt = cn && n ? `全${n}台（自店${cn.own || 0}・他店${cn.other || 0}）` : `全${n}台`;
+    const more = n > 1 ? `<button type="button" class="acount" data-aunits="${esc(cat)}">${cntTxt} ▼</button><div class="aunits" data-units="${esc(cat)}" hidden>${
+      [...units].sort((x, y) => (y.date || 0) - (x.date || 0)).map((u, i) => `<div class="aunit"><b>${i + 1}</b> ${esc(u.model) || '（型式なし）'}<br>${whenOf(u)}${u.place ? '・' + esc(u.place) : ''}${u.date ? '・' + fmtAge(u.date) : ''}${seenOf(u) ? '<br>' + seenOf(u) : ''}${chkBtn(cat, u)}</div>`).join('')
+      }${n > units.length ? `<div class="aunit">店クラウドVには${n}台あります（地図には${units.length}台分の詳細）。残りは店クラウドVで確認してください</div>` : ''}</div>` : cn && cn.other ? '他店で購入' : '';
+    if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし${n ? '<br>' + more : ''}</span><span></span>`;
+    const seen = seenOf(a) ? '<br>' + seenOf(a) : '';
+    const info = a.date ? `${esc(a.model)}<br>${whenOf(a)}${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
-    const chk = a.fromRec ? '' : `<button type="button" class="acheck" data-acheck="${esc(cat)}">確認・変更</button>`;
-    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}${chk}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
+    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}${chkBtn(cat, a)}${more ? '<br>' + more : ''}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
   }).join('');
   const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
@@ -1655,7 +1685,7 @@ function select(code, pan) {
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
       <div class="blk recblk"><h3>記録をつける</h3>
-        <div class="row"><button class="btn" type="button" data-rec="お店誌">お店誌を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">所有を確認した</button></div>
+        <div class="row"><button class="btn" type="button" data-rec="お店誌">お店誌を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
         ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
@@ -2101,7 +2131,7 @@ function fillProducts() {
   const list = V_PRODUCTS[rfEl('appl').value] || [];
   rfEl('pcode').innerHTML = (list.length ? '' : opt('', '店クラウドVで選ぶ')) + list.map(([c, n]) => opt(c, `${n}（${c}）`)).join('');
 }
-rfEl('appl').addEventListener('change', fillProducts);
+rfEl('appl').addEventListener('change', () => { fillProducts(); showApplFields(); });
 // a value from an older record that is not one of the choices still shows (and is kept)
 function setChoice(name, v) {
   const el = rfEl(name); if (v == null) return;
@@ -2140,7 +2170,12 @@ function openRecForm(kind, code, rec, ex) {
 function showApplFields() {
   const f = $('#recForm form');
   $('#recForm .applOnly').hidden = f.elements.kind.value !== '所有確認';
-  $('#recForm .exOnly').hidden = !(f.elements.origModel.value || f.elements.origDate.value);
+  const ex = !!(f.elements.origModel.value || f.elements.origDate.value);
+  $('#recForm .exOnly').hidden = !ex;
+  // a 新しく見つけた家電 of a kind already on file may be a double registration
+  const c = recEditing && customers.get(recEditing.code), appl = f.elements.appl.value, cat = appl === '熱源' ? 'IH' : appl;
+  const n = c && !ex ? Math.max((c.cnt && c.cnt[cat] && c.cnt[cat].n) || 0, (c.appl[cat] || []).filter(u => (u.date || u.model) && !u.recGone && !u.fromRec).length) : 0;
+  $('#rfWarn').textContent = n ? `この家電は店クラウドVにすでに${n}台登録されています。登録済みのものは、お客様画面の家電一覧の「確認・変更」で記録してください（二重登録を防ぐため）` : '';
 }
 $('#rfKind').addEventListener('change', showApplFields);
 $('#rfCancel').addEventListener('click', () => { $('#recForm').hidden = true; });
@@ -2162,8 +2197,13 @@ $('#recForm form').addEventListener('submit', e => {
   toast('記録しました', 2000);
 });
 $('#card').addEventListener('click', e => {
-  const b = e.target.closest('[data-rec],[data-redit],[data-rdel],[data-acheck]'); if (!b || !selected) return;
-  if (b.dataset.acheck) { const a = currentAppliance(customers.get(selected), b.dataset.acheck); if (a) openRecForm('所有確認', selected, null, { cat: b.dataset.acheck, a }); }
+  const b = e.target.closest('[data-rec],[data-redit],[data-rdel],[data-acheck],[data-aunits]'); if (!b || !selected) return;
+  if (b.dataset.acheck) {
+    const [cat, i] = b.dataset.acheck.split('|'), cu = customers.get(selected);
+    const a = i != null && i !== '-1' ? cu.appl[cat][+i] : currentAppliance(cu, cat);
+    if (a) openRecForm('所有確認', selected, null, { cat, a });
+  }
+  else if (b.dataset.aunits) { const d = [...$('#card').querySelectorAll('[data-units]')].find(x => x.dataset.units === b.dataset.aunits); d.hidden = !d.hidden; b.textContent = b.textContent.replace(/[▼▲]/, d.hidden ? '▼' : '▲'); }
   else if (b.dataset.rec) openRecForm(b.dataset.rec, selected);
   else if (b.dataset.redit) openRecForm(null, selected, computeRecords().recs.get(b.dataset.redit));
   else if (b.dataset.rdel && confirm('この記録を消しますか？')) recAdd({ op: 'del', recId: b.dataset.rdel });
