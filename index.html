@@ -891,22 +891,23 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <input type="hidden" name="origModel"><input type="hidden" name="origDate">
       <div class="two">
         <label>家電<select name="appl"><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>その他</option></select></label>
-        <label>メーカー<input name="maker" list="rfMakers"></label>
+        <label>商品（店クラウドVの商品コード）<select name="pcode"></select></label>
       </div>
       <div class="two">
         <label>型式（品番）<input name="model" autocapitalize="characters"></label>
         <label>製造年<input name="year" type="number" inputmode="numeric" min="1980" max="2100" placeholder="例 2018"></label>
       </div>
       <div class="two">
-        <label>設置場所<input name="place" list="rfPlaces"></label>
+        <label>メーカー<select name="maker"></select></label>
+        <label>設置場所<select name="place"></select></label>
+      </div>
+      <div class="two">
         <label>自店・他店<select name="store"><option value="">－</option><option>自店</option><option>他店</option></select></label>
       </div>
     </div>
     <label>メモ<textarea name="memo"></textarea></label>
     <div class="acts"><button type="button" class="btn" id="rfCancel">やめる</button><button type="submit" class="btn primary">保存</button></div>
   </form>
-  <datalist id="rfMakers"><option>パナソニック</option><option>日立</option><option>東芝</option><option>三菱</option><option>シャープ</option><option>象印</option><option>タイガー</option><option>アイリスオーヤマ</option><option>ダイキン</option><option>富士通ゼネラル</option><option>ソニー</option><option>リンナイ</option><option>ノーリツ</option><option>長府</option><option>コロナ</option></datalist>
-  <datalist id="rfPlaces"><option>台所</option><option>キッチン</option><option>居間</option><option>1階</option><option>2階</option><option>離れ</option><option>屋外</option></datalist>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -2073,7 +2074,40 @@ async function recLoad() {
 window.addEventListener('online', recFlush);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') recFlush(); });
 
-// the entry form
+// the entry form: 商品・メーカー・設置場所 use 店クラウドV's own choices, so the CSV can be entered as is
+const V_PRODUCTS = {
+  '炊飯器': [[49002, 'ＩＨジャー炊飯器'], [49003, 'ジャー炊飯器'], [49001, '炊飯器'], [49004, '電子ジャー'], [45004, 'ガス炊飯器']],
+  'レンジ': [[44001, 'オーブンレンジ'], [44002, '電子レンジ'], [44004, 'オーブン'], [45010, 'ビルトインガスレンジ']],
+  '熱源': [[48001, 'IHクッキングヒーター'], [45002, 'ガステーブル'], [45003, 'ガスコンロ'], [45007, 'ビルトインガスコンロ'], [71101, 'ビルトインコンロ']],
+  'テレビ': [[10012, '32型以下液晶TV'], [10013, '37型以上液晶ＴＶ'], [10022, '有機ＥＬテレビ'], [10011, 'プラズマTV'], [10001, 'ブラウン管カラーＴＶ']],
+  '冷蔵庫': [[60006, '冷蔵庫451L以上'], [60005, '冷蔵庫450L以下'], [60004, '冷蔵庫400L以下'], [60003, '冷蔵庫300L以下'], [60002, 'パーソナル冷蔵庫'], [60007, 'フリーザー']],
+  '洗濯機': [[40003, '洗濯機'], [40001, 'ドラム式洗濯機'], [40002, '洗濯乾燥機'], [40004, '二槽式洗濯機'], [40005, '乾燥機']],
+  '給湯器': [[75001, 'エコキュート'], [74002, '電気温水器'], [74006, '石油給湯機'], [74001, '電気給湯器'], [45008, 'ガス給湯器']],
+  'エアコン': [[61004, '冷暖房エアコン室内機'], [62001, 'パッケージエアコン室内機'], [61009, '冷暖房窓用エアコン'], [61007, '冷暖房エアコン床置型']],
+  '掃除機': [[42001, '掃除機'], [42002, '充電式・電池式掃除機']],
+  'その他': [],
+};
+const V_MAKERS = [['Pana', 'パナソニック'], ['ｼｬｰﾌﾟ', 'シャープ'], ['ﾋﾀﾁ', '日立'], ['ﾄｳｼﾊﾞ', '東芝'], ['ﾐﾂﾋﾞｼ', '三菱'], ['ｿﾆｰ', 'ソニー'],
+  ['ｿﾞｳｼﾞﾙｼ', '象印'], ['ﾀｲｶﾞｰ', 'タイガー'], ['ﾀﾞｲｷﾝ', 'ダイキン'], ['ﾌｼﾞｾﾞﾈ', '富士通ゼネラル'], ['ｺﾛﾅ', 'コロナ'], ['長府', '長府'],
+  ['ﾉｰﾘﾂ', 'ノーリツ'], ['ﾊﾟﾛﾏ', 'パロマ'], ['ｻﾝﾖｰ', 'サンヨー'], ['AQUA', 'アクア'], ['NEC', 'NEC'], ['ﾋﾞｸﾀｰ', 'ビクター'], ['ﾊﾟｲｵﾆｱ', 'パイオニア'],
+  ['ﾄﾖﾄﾐ', 'トヨトミ'], ['ﾀﾞｲﾆﾁ', 'ダイニチ'], ['ﾂｲﾝﾊﾞｰﾄﾞ', 'ツインバード'], ['ｲﾜﾀﾆ', 'イワタニ'], ['ﾌｼﾞﾂｳ', '富士通']].filter(m => m[1]);
+const V_PLACES = ['メイン', 'サブ', '台所', '洗面所', '浴室', '寝室', '和室', '座敷1', '座敷2', '応接室', 'リビング', '子供室１', '子供室２', '子供室３',
+  '２階部屋1', '２階部屋2', '玄関', '廊下', '倉庫', '納戸', 'トイレ', '屋外', 'ﾍﾞﾗﾝﾀﾞ'];
+const opt = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
+const rfEl = n => $('#recForm form').elements[n];
+rfEl('maker').innerHTML = opt('', '－（分からない）') + V_MAKERS.map(([v, t]) => opt(v, `${t}（${v}）`)).join('');
+rfEl('place').innerHTML = opt('', '－') + V_PLACES.map(v => opt(v, v)).join('');
+function fillProducts() {
+  const list = V_PRODUCTS[rfEl('appl').value] || [];
+  rfEl('pcode').innerHTML = (list.length ? '' : opt('', '店クラウドVで選ぶ')) + list.map(([c, n]) => opt(c, `${n}（${c}）`)).join('');
+}
+rfEl('appl').addEventListener('change', fillProducts);
+// a value from an older record that is not one of the choices still shows (and is kept)
+function setChoice(name, v) {
+  const el = rfEl(name); if (v == null) return;
+  if (v !== '' && ![...el.options].some(o => o.value === String(v))) el.insertAdjacentHTML('beforeend', opt(v, v));
+  el.value = v;
+}
 let recEditing = null;
 // ex: an appliance already on file ({ cat, a }), opened with its 確認・変更 button
 function openRecForm(kind, code, rec, ex) {
@@ -2095,8 +2129,10 @@ function openRecForm(kind, code, rec, ex) {
   for (const el of f.elements) {
     if (!el.name) continue;
     if (el.type === 'radio') el.checked = el.value === v[el.name];
+    else if (['pcode', 'maker', 'place'].includes(el.name)) continue;
     else if (v[el.name] != null) el.value = v[el.name];
   }
+  fillProducts(); setChoice('pcode', v.pcode); setChoice('maker', v.maker ?? ''); setChoice('place', v.place ?? '');
   $('#rfOrig').textContent = v.origModel || v.origDate ? `登録済み：${v.appl} ${v.origModel || '（型式なし）'}${v.origDate ? '・' + v.origDate : ''}　違っていれば下で直してください` : '';
   showApplFields();
   $('#recForm').hidden = false;
@@ -2116,7 +2152,7 @@ $('#recForm form').addEventListener('submit', e => {
   if (!kind) { toast('「お店誌・訪問・所有確認」のどれかを選んでください', 3000); return; }
   const rec = { id: recEditing.id || newId(), kind, date: f.elements.date.value, staff: f.elements.staff.value, code: c.code, name: c.name,
     memo: f.elements.memo.value.trim(), writer: writerId, at: new Date().toISOString() };
-  if (kind === '所有確認') Object.assign(rec, { appl: f.elements.appl.value, maker: f.elements.maker.value.trim(), model: f.elements.model.value.trim().normalize('NFKC').toUpperCase(),
+  if (kind === '所有確認') Object.assign(rec, { appl: f.elements.appl.value, pcode: f.elements.pcode.value, maker: f.elements.maker.value, model: f.elements.model.value.trim().normalize('NFKC').toUpperCase(),
     year: f.elements.year.value, place: f.elements.place.value.trim(), store: f.elements.store.value });
   if (kind === '所有確認' && (f.elements.origModel.value || f.elements.origDate.value))
     Object.assign(rec, { status: f.elements.status.value || '使用中', origModel: f.elements.origModel.value, origDate: f.elements.origDate.value });
@@ -2142,20 +2178,20 @@ $('#recExportGo').addEventListener('click', () => {
     .sort((a, b) => (a.date === b.date ? (a.code < b.code ? -1 : 1) : a.date < b.date ? -1 : 1));
   if (!rows.length) { toast('書き出す記録がありません', 3000); return; }
   // 区分 tells 既存の確認 (an appliance already in 店クラウドV) from 新しく見つけた (not registered yet); 店クラウドVでの入力 says what to do with each row
-  const head = ['日付', '顧客コード', '顧客名', '担当者', '内容', '区分', '状態', '家電', 'メーカー', '型式(品番)', '製造年', '設置場所', '自店・他店',
+  const head = ['日付', '顧客コード', '顧客名', '担当者', '内容', '区分', '状態', '家電', '商品コード', 'メーカー', '型式(品番)', '製造年', '設置場所', '自店・他店',
     '元の型式', '元の納品日', '確認日(廃棄日付)', '店クラウドVでの入力', 'メモ', '記録ID', '入力済み'];
   const q = v => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const todo = r => {
     const d = r.date.replace(/-/g, '/');
-    if (r.kind === '訪問') return '接点に「訪問」を登録';
-    if (r.kind === 'お店誌') return '接点に「お店誌」を登録';
+    if (r.kind === '訪問') return '接点の「訪問」にチェック';
+    if (r.kind === 'お店誌') { const m = +r.date.slice(5, 7); return `接点の「特選品${m >= 3 && m <= 5 ? '春' : m >= 6 && m <= 8 ? '夏' : m >= 9 && m <= 11 ? '秋' : '冬'}」にチェック`; }
     if (r.status === '処分済み') return `元の所有を「廃棄」・廃棄日付 ${d}`;
     if (r.status === '譲渡') return `元の所有を「贈答」・廃棄日付 ${d}`;
     if (r.status) return `元の所有の廃棄日付に ${d}` + (r.model && normQ(r.model) !== normQ(r.origModel) ? '・型式などを直す' : '');
     return `所有を新規登録（${r.store === '他店' ? `他店・納品日 ${r.year ? r.year + '/01/01' : '製造年の1/1'}` : r.store || '自店か他店か確認'}）・廃棄日付 ${d}`;
   };
   const lines = [head.join(',')].concat(rows.map(r => [r.date.replace(/-/g, '/'), r.code, r.name, r.staff, r.kind,
-    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl, r.maker, r.model, r.year, r.place, r.store,
+    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl, r.pcode, r.maker, r.model, r.year, r.place, r.store,
     r.origModel, r.origDate, r.kind === '所有確認' && (!r.status || r.status === '使用中') ? r.date.replace(/-/g, '/') : '',
     todo(r), r.memo, r.id, done.has(r.id) ? '済' : ''].map(q).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' });
