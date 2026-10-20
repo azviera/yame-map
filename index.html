@@ -721,6 +721,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .lb-g.k{-webkit-text-stroke:3px #000}
 .lb-g.w{-webkit-text-stroke:3px #fff}
 .lb-g.dg{font-size:14px}
+.lb-b.ta{position:relative}.lb-b.ta::after{content:"";position:absolute;right:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #000}
 .lb-b.maru{background-image:linear-gradient(transparent 36%,#ffe94d 36%,#ffe94d 64%,transparent 64%)}
 .lb-sora{background:#5fe3f0;color:#000;border-color:#000}
 .lb-dash{display:inline-block;width:16px;height:6px;border-radius:3px;background:#111;border:1px solid #fff}
@@ -1084,11 +1085,11 @@ function ingest(rows, fileName) {
     // appliances: columns like 炊飯器1品番 / 炊飯器1納品日付 / 炊飯器1設置場所区分 / 炊飯器1廃棄日付
     const groups = {};
     for (const k in row) {
-      const m = k.match(/^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付)$/);
+      const m = k.match(/^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他)$/);
       if (!m || m[1] === '顧客') continue;
       if ((m[2] && m[2] !== '1') || /サブ$/.test(m[1])) continue;   // only the main unit (…1 columns): not テレビ2〜5 or サブ
       const g = groups[m[1] + m[2]] ||= { cat: catOf(m[1]) };
-      const f = m[3].startsWith('品番') ? 'model' : m[3].startsWith('納品') ? 'date' : m[3].startsWith('設置') ? 'place' : 'disposed';
+      const f = m[3].startsWith('品番') ? 'model' : m[3].startsWith('納品') ? 'date' : m[3].startsWith('設置') ? 'place' : m[3] === '自他' ? 'store' : 'disposed';
       g[f] = row[k];
     }
     const dated = new Set();
@@ -1098,7 +1099,7 @@ function ingest(rows, fileName) {
       const key = ['a', g.cat, model, fmtDate(d)].join('|');
       if (c.keys.has(key)) continue;
       c.keys.add(key);
-      (c.appl[g.cat] ||= []).push({ model, date: d, place: String(g.place ?? '').trim(), checked: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
+      (c.appl[g.cat] ||= []).push({ model, date: d, place: String(g.place ?? '').trim(), store: String(g.store ?? '').trim(), checked: parseDate(g.disposed), maru: /[○〇◯]/.test(custom) });
       if (d) dated.add(g.cat);
     }
     // カスタム like "8年以上○": ○ = ownership confirmed by eye; no delivery date needed
@@ -1163,7 +1164,7 @@ function arraysToObjects(arr) {
   // keep only the columns the map uses (the ownership file has 233; this makes reading it much faster)
   const keep = head.map((k, i) => [k.replace(/[\s　]/g, ''), i]).filter(([k]) => k && (
     /顧客コード|顧客CD|顧客番号|顧客名|氏名|住所|座標|緯度|経度|ランク|RFM|担当|接点|訪問|カスタム|結合|電話|TEL|携帯/i.test(k) ||
-    (/^(.+?)(1?)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付)$/.test(k) && !/サブ\d|[2-9]\d*(品番|納品|設置|廃棄)/.test(k))));
+    (/^(.+?)(1?)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他)$/.test(k) && !/サブ\d|[2-9]\d*(品番|納品|設置|廃棄|自他)/.test(k))));
   const out = [];
   for (let j = h + 1; j < arr.length; j++) {
     const r = arr[j];
@@ -1375,7 +1376,7 @@ const STAGE_NO = { 'チラシ':1, '推進':2, '見込み':3 };
 const staffColor = s => STAFF_COL[s] || GREY;
 const STAR = `<svg class="lb-star" viewBox="0 0 24 24"><path d="M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z" fill="#ffe94d" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 const glyph = (t, col, cls = '') => `<i class="lb-g ${cls}" style="color:${col}">${t}</i>`;
-const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
+const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}${a.store === '他店' ? ' ta' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 function catalogPin(c) {
@@ -1491,6 +1492,7 @@ function renderLogoToggles() {
     row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
     row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
     row(box('湯', fresh, '給湯器') + box('湯', dummy, '給湯器'), '給湯器　水色＝15年以上・赤＝15年未満（ランクの右隣）') +
+    row(box('炊', { ...dummy, store: '他店' }, '炊飯器'), '右上の白い丸＝他店で買ったもの') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（下の日付以降に所有を確認）') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
@@ -1620,7 +1622,9 @@ function select(code, pan) {
     if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし</span><span></span>`;
     const b = bucketOf(yearsSince(a.date));
     const seen = checkedOn(a) ? `<br>${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '<br>○ 所有を目視で確認' : '';
-    const info = a.date ? `${esc(a.model)}<br>${fmtDate(a.date)} 納品${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
+    // 他店 purchases are registered on 1 January of the year made (the shop never sells on 1/1)
+    const when = !a.date ? '' : a.store === '他店' ? (a.date.getMonth() === 0 && a.date.getDate() === 1 ? `他店・${a.date.getFullYear()}年製` : `他店・${fmtDate(a.date)}`) : `${fmtDate(a.date)} 納品`;
+    const info = a.date ? `${esc(a.model)}<br>${when}${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
     return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
@@ -1945,7 +1949,7 @@ function applyRecords() {
       const m = normQ(r.model);
       const same = m && list.find(a => !a.fromRec && normQ(a.model) === m);
       if (same) same.recChecked = d;
-      else list.push({ model: r.model || '', date: r.year ? new Date(+r.year, 0, 1) : null, place: r.place || '', checked: d, maru: false, fromRec: true });
+      else list.push({ model: r.model || '', date: r.year ? new Date(+r.year, 0, 1) : null, place: r.place || '', store: r.store || '', checked: d, maru: false, fromRec: true });
     }
   }
   finalize();
