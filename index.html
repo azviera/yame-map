@@ -2018,9 +2018,11 @@ function applyRecords() {
 function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
 function recListHTML(code) {
   const { recs, done } = computeRecords();
-  const list = [...recs.values()].filter(r => r.code === code).sort((a, b) => (a.date < b.date ? 1 : -1));
+  // 店クラウドVに入力済みの記録は一覧に出さない（データは記録フォルダに残る）
+  const mine = [...recs.values()].filter(r => r.code === code);
+  const list = mine.filter(r => !done.has(r.id)).sort((a, b) => (a.date < b.date ? 1 : -1));
   const pend = new Set(recPending.filter(e => e.op === 'put').map(e => e.rec.id));
-  if (!list.length) return '<div class="empty" style="margin-top:6px">この地図からの記録はまだありません</div>';
+  if (!list.length) return `<div class="empty" style="margin-top:6px">${mine.length ? '記録はすべて店クラウドVに入力済みです' : 'この地図からの記録はまだありません'}</div>`;
   return `<ul class="reclist">${list.map(r => {
     const what = r.kind === '所有確認' ? `${r.status ? '【' + esc(r.status) + '】' : '【新しく見つけた】'}${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.dlv ? '・' + esc(r.dlv.replace(/-/g, '/')) + '納品' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
     const tags = (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
