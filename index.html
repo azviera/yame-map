@@ -1329,7 +1329,7 @@ function makeSample() {
 /* ---------- map ---------- */
 // a finger tap often slides a few pixels; Leaflet treats more than 3px as a drag and drops the tap
 L.Draggable.mergeOptions({ clickTolerance: L.Browser.mobile ? 12 : 4 });
-const map = L.map('map', { minZoom: 5, zoomControl: false, preferCanvas: true, attributionControl: true }).setView([STORE.lat, STORE.lng], 14);
+const map = L.map('map', { minZoom: 5, maxZoom: 22, zoomControl: false, preferCanvas: true, attributionControl: true }).setView([STORE.lat, STORE.lng], 14);
 const renderer = L.canvas({ tolerance: L.Browser.mobile ? 16 : 8 });   // wider tap margin for fingers
 let tileFailed = false;
 const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>';
@@ -1362,7 +1362,7 @@ function setBase(k) {
   if (GBASES[k]) {
     loadGoogle().then(() => {
       if (seq !== baseSeq) return;
-      tiles = L.gridLayer.googleMutant({ type: GBASES[k][0], maxZoom: 19 }).addTo(map);
+      tiles = L.gridLayer.googleMutant({ type: GBASES[k][0], maxZoom: 22 }).addTo(map);   // 家が重ならないよう、もっと拡大できるように
       tiles.bringToBack();
       $('#map').classList.remove('gridbg');
     }).catch(e => { toast(e.message, 6000); if (seq === baseSeq) { $('#baseSel').value = 'pale'; setBase('pale'); } });
@@ -1370,7 +1370,7 @@ function setBase(k) {
     return;
   }
   let loaded = false;
-  tiles = L.tileLayer(BASES[k][0], { maxZoom: 19, ...BASES[k][1] }).addTo(map);
+  tiles = L.tileLayer(BASES[k][0], { maxZoom: 22, ...BASES[k][1] }).addTo(map);   // 元の地図より細かい所は拡大して見せる（maxNativeZoom）
   // keep the layer even when tiles fail, so the map comes back by itself once the connection does
   tiles.on('tileerror', () => {
     if (loaded || tileFailed) return; tileFailed = true;
