@@ -1354,15 +1354,34 @@ const loadGoogle = () => googleReady ||= (async () => {
 let baseKey = GOOGLE_KEY ? 'gmap' : 'pale';
 try { const b = localStorage.getItem('yame-base'); if (GOOGLE_KEY && GBASES[b]) baseKey = b; } catch {}
 let tiles = null, baseSeq = 0;
+// 航空写真は、その場所で写真がある一番細かい段階までしか拡大しない（それ以上は写真が出ず真っ白になるため）
+const SAT_FALLBACK_ZOOM = 19;
+let satZoomService = null;
+function fitSatelliteZoom() {
+  if (baseKey !== 'gsat') { map.setMaxZoom(22); return; }
+  const apply = z => { map.setMaxZoom(z); if (map.getZoom() > z) map.setZoom(z); };
+  try {
+    satZoomService ||= new google.maps.MaxZoomService();
+    const c = map.getCenter();
+    satZoomService.getMaxZoomAtLatLng({ lat: c.lat, lng: c.lng }, r => {
+      if (baseKey !== 'gsat') return;
+      apply(r && r.status === 'OK' && r.zoom ? Math.min(r.zoom, 22) : SAT_FALLBACK_ZOOM);
+    });
+  } catch { apply(SAT_FALLBACK_ZOOM); }
+}
+map.on('moveend', () => { if (baseKey === 'gsat') fitSatelliteZoom(); });
 function setBase(k) {
   if (tiles) map.removeLayer(tiles);
   tiles = null;
   baseKey = k; tileFailed = false;
   const seq = ++baseSeq;
+  if (k !== 'gsat') map.setMaxZoom(22);
   if (GBASES[k]) {
     loadGoogle().then(() => {
       if (seq !== baseSeq) return;
-      tiles = L.gridLayer.googleMutant({ type: GBASES[k][0], maxZoom: 22 }).addTo(map);   // 家が重ならないよう、もっと拡大できるように
+      // 家が重ならないよう、もっと拡大できるように。航空写真は写真のある段階まで（fitSatelliteZoom）
+      tiles = L.gridLayer.googleMutant({ type: GBASES[k][0], maxZoom: 22, ...(k === 'gsat' ? { maxNativeZoom: SAT_FALLBACK_ZOOM } : {}) }).addTo(map);
+      if (k === 'gsat') fitSatelliteZoom();
       tiles.bringToBack();
       $('#map').classList.remove('gridbg');
     }).catch(e => { toast(e.message, 6000); if (seq === baseSeq) { $('#baseSel').value = 'pale'; setBase('pale'); } });
