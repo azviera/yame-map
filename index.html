@@ -645,6 +645,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #recForm .seg input{height:auto}
 #rfKind label:has(input:checked){background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:700}
 #rfKind input{accent-color:#fff}
+#rfKind label[hidden]{display:none}
 #rfKindHint{font-size:12px;color:var(--muted,#666);margin-top:-4px}
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
@@ -2187,7 +2188,13 @@ function openRecForm(kind, code, rec, ex) {
 const selKinds = () => [...$('#recForm form').querySelectorAll('input[name="kind"]:checked')].map(x => x.value);
 function showApplFields() {
   const f = $('#recForm form');
-  $('#recForm .applOnly').hidden = !selKinds().includes('所有確認');
+  const ks = selKinds(), isAppl = ks.includes('所有確認');
+  $('#recForm .applOnly').hidden = !isAppl;
+  // 「新しく見つけた家電」を選んだら それだけ、ほかを選んだら「新しく見つけた家電」を隠す。何も選んでいなければ全部出す
+  for (const x of $('#rfKind').querySelectorAll('input[name="kind"]'))
+    x.closest('label').hidden = ks.length > 0 && (isAppl ? x.value !== '所有確認' : x.value === '所有確認');
+  $('#rfKindHint').textContent = isAppl ? '「新しく見つけた家電」を記録します（外すと、ほかの種類を選べます）'
+    : 'いくつでも選べます（まとめて1回の「保存」で記録）';
   const ex = !!(f.elements.origModel.value || f.elements.origDate.value);
   $('#recForm .exOnly').hidden = !ex;
   // a registered appliance keeps its 納品日; a new find is entered with the year it was made
