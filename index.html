@@ -878,6 +878,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <label><input type="radio" name="kind" value="お店誌">お店誌を渡した</label>
       <label><input type="radio" name="kind" value="訪問">訪問した</label>
       <label><input type="radio" name="kind" value="所有確認">新しく見つけた家電</label>
+      <label><input type="radio" name="kind" value="Aチラシ">1 チラシ</label>
+      <label><input type="radio" name="kind" value="B推進">2 推進</label>
+      <label><input type="radio" name="kind" value="C見込み">3 見込み</label>
     </div>
     <div class="two">
       <label>日付<input type="date" name="date" required></label>
@@ -1687,6 +1690,7 @@ function select(code, pan) {
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
       <div class="blk recblk"><h3>記録をつける</h3>
         <div class="row"><button class="btn" type="button" data-rec="お店誌">お店誌を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
+        <div class="row"><button class="btn" type="button" data-rec="Aチラシ">1 チラシ</button><button class="btn" type="button" data-rec="B推進">2 推進</button><button class="btn" type="button" data-rec="C見込み">3 見込み</button></div>
         ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
@@ -1973,10 +1977,13 @@ function computeRecords() {
   }
   return { recs, done };
 }
+// キャンペーンの接点（店クラウドVの Aチラシ・B推進・C見込み）。地図では 1・2・3 の印
+const CP_KINDS = ['Aチラシ', 'B推進', 'C見込み'];
 // put the records onto the customers (undoing what an earlier pass added first)
 function applyRecords() {
   for (const c of customers.values()) {
     c.visits = c.visits.filter(v => !v.fromRec);
+    c.events = c.events.filter(v => !v.fromRec);
     for (const k in c.appl) {
       c.appl[k] = c.appl[k].filter(a => !a.fromRec);
       for (const a of c.appl[k]) { if (a._o) Object.assign(a, a._o); delete a._o; delete a.recChecked; delete a.recGone; }
@@ -1988,6 +1995,7 @@ function applyRecords() {
     const c = customers.get(r.code); if (!c) continue;
     const d = r.date ? new Date(r.date + 'T00:00:00') : null;
     if (r.kind === '訪問') c.visits.push({ date: d, staff: r.staff, kind: '訪問', custom: '', fromRec: true });
+    else if (CP_KINDS.includes(r.kind)) c.events.push({ date: d, staff: r.staff, kind: r.kind, custom: '', fromRec: true });   // 1チラシ・2推進・3見込み
     else if (r.kind === 'お店誌') {
       if (!('_cat0' in c)) { c._cat0 = c.catalog; c._ct0 = c.catalogTarget; }
       c.catalog = r.staff; c.catalogTarget = true;
@@ -2190,7 +2198,12 @@ $('#recForm form').addEventListener('submit', e => {
   e.preventDefault();
   const f = e.target, c = customers.get(recEditing.code);
   const kind = f.elements.kind.value;
-  if (!kind) { toast('「お店誌・訪問・所有確認」のどれかを選んでください', 3000); return; }
+  if (!kind) { toast('「お店誌・訪問・所有確認・1〜3」のどれかを選んでください', 3000); return; }
+  if (CP_KINDS.includes(kind)) {   // 同じ印をもう一度つけようとしていないか
+    const st = stageOf(kind), dupRec = [...computeRecords().recs.values()].some(r => r.code === c.code && r.kind === kind && r.id !== recEditing.id);
+    const dupV = c.events.some(ev => !ev.fromRec && stageOf(ev.kind) === st);
+    if ((dupRec || dupV) && !confirm(`このお客様には「${kind.slice(1)}」がすでに${dupV ? '店クラウドVに' : '記録に'}あります。もう一度記録しますか？`)) return;
+  }
   const rec = { id: recEditing.id || newId(), kind, date: f.elements.date.value, staff: f.elements.staff.value, code: c.code, name: c.name,
     memo: f.elements.memo.value.trim(), writer: writerId, at: new Date().toISOString() };
   if (kind === '所有確認') Object.assign(rec, { appl: f.elements.appl.value, pcode: f.elements.pcode.value, maker: f.elements.maker.value, model: f.elements.model.value.trim().normalize('NFKC').toUpperCase(),
@@ -2230,6 +2243,7 @@ $('#recExportGo').addEventListener('click', () => {
   const todo = r => {
     const d = r.date.replace(/-/g, '/');
     if (r.kind === '訪問') return '接点の「訪問」にチェック';
+    if (CP_KINDS.includes(r.kind)) return `接点の「${r.kind}」にチェック`;
     if (r.kind === 'お店誌') { const m = +r.date.slice(5, 7); return `接点の「特選品${m >= 3 && m <= 5 ? '春' : m >= 6 && m <= 8 ? '夏' : m >= 9 && m <= 11 ? '秋' : '冬'}」にチェック`; }
     if (r.status === '処分済み') return `元の所有を「廃棄」・廃棄日付 ${d}`;
     if (r.status === '譲渡') return `元の所有を「贈答」・廃棄日付 ${d}`;
