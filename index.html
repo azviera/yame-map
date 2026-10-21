@@ -1374,16 +1374,20 @@ map.on('moveend', () => { if (baseKey === 'gsat') fitSatelliteZoom(); });
 // 動かさずに離せば、今まで通りの「ダブルタップで拡大」
 (() => {
   const el = map.getContainer();
-  // 2本指の拡大と同じしくみ（Leaflet の pinch）で、指の動きに合わせて途中の段階も含めて滑らかに拡大する。
-  // 途中ではお客様の印を描き直さず（zoomend が出ない）、指を離したときに一番近い段階へそろえて1回だけ描き直す
+  // 指を動かしている間は、地図（印も含む）を画像のまま拡大縮小して見せるだけにする（GPU で動くので滑らか）。
+  // 本当の拡大は指を離したときに1回だけ（そこで印を描き直す）。約120ピクセル動かすと1段階
+  const PX_PER_LEVEL = 120;
+  const pane = map.getPane('mapPane');
   let lastTap = 0, lastPt = null, on = false, moved = false, startY = 0, startZoom = 0, anchor = null, anchorPt = null;
-  let curY = 0, raf = 0, center = null, zoom = 0;
+  let curY = 0, raf = 0, zoom = 0, panePos = null;
+  const scaleTo = z => {
+    const s = Math.pow(2, z - startZoom);
+    pane.style.transform = `translate3d(${panePos.x}px,${panePos.y}px,0) scale(${s})`;
+  };
   const frame = () => {
     raf = 0;
-    zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), startZoom + (curY - startY) / 90));
-    const off = anchorPt.subtract(map.getSize().divideBy(2));
-    center = map.unproject(map.project(anchor, zoom).subtract(off), zoom);
-    map._move(center, zoom, { pinch: true, round: false });
+    zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), startZoom + (curY - startY) / PX_PER_LEVEL));
+    scaleTo(zoom);
   };
   el.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) { if (on) { on = false; map.dragging.enable(); } lastTap = 0; return; }
@@ -1392,7 +1396,7 @@ map.on('moveend', () => { if (baseKey === 'gsat') fitSatelliteZoom(); });
       const r = el.getBoundingClientRect();
       on = true; moved = false; startY = curY = t.clientY; startZoom = zoom = map.getZoom();
       anchorPt = L.point(t.clientX - r.left, t.clientY - r.top);
-      anchor = map.containerPointToLatLng(anchorPt); center = map.getCenter();
+      anchor = map.containerPointToLatLng(anchorPt);
       map.dragging.disable();
       e.preventDefault(); e.stopPropagation();
       lastTap = 0; return;
@@ -1402,7 +1406,12 @@ map.on('moveend', () => { if (baseKey === 'gsat') fitSatelliteZoom(); });
   el.addEventListener('touchmove', e => {
     if (!on || e.touches.length !== 1) return;
     curY = e.touches[0].clientY;
-    if (!moved && Math.abs(curY - startY) > 8) { moved = true; map._stop(); map._moveStart(true, false); }
+    if (!moved && Math.abs(curY - startY) > 8) {
+      moved = true; map._stop();
+      panePos = L.DomUtil.getPosition(pane);
+      pane.style.transformOrigin = `${anchorPt.x - panePos.x}px ${anchorPt.y - panePos.y}px`;
+      pane.style.willChange = 'transform';
+    }
     if (moved && !raf) raf = requestAnimationFrame(frame);
     e.preventDefault(); e.stopPropagation();
   }, { passive: false, capture: true });
@@ -1411,12 +1420,15 @@ map.on('moveend', () => { if (baseKey === 'gsat') fitSatelliteZoom(); });
     on = false; map.dragging.enable();
     if (raf) { cancelAnimationFrame(raf); frame(); }
     if (!moved) map.setZoomAround(anchor, Math.min(map.getMaxZoom(), map.getZoom() + 1));
-    else {   // 一番近い段階へそろえる（ここで1回だけ zoomend → 印を描き直す）
+    else {   // 一番近い段階まで短くなめらかに寄せてから、本当の拡大を1回だけ（ここで印を描き直す）
       const z = map._limitZoom(Math.round(zoom));
-      const off = anchorPt.subtract(map.getSize().divideBy(2));
-      const c = map.unproject(map.project(anchor, z).subtract(off), z);
-      if (map.options.zoomAnimation) map._animateZoom(c, z, true, map.options.zoomSnap);
-      else map._resetView(c, z);
+      pane.style.transition = 'transform 140ms ease-out';
+      scaleTo(z);
+      setTimeout(() => {
+        pane.style.transition = ''; pane.style.willChange = ''; pane.style.transformOrigin = '';
+        L.DomUtil.setPosition(pane, panePos);   // 元の位置（拡大なし）に戻してから
+        if (z !== startZoom) map.setZoomAround(anchor, z, { animate: false });
+      }, 150);
     }
     e.preventDefault(); e.stopPropagation();
   };
