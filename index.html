@@ -742,6 +742,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .lb-b.ta{position:relative}.lb-b.ta::after{content:"";position:absolute;right:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #000}
 .lb-b.maru{background-image:linear-gradient(transparent 36%,#ffe94d 36%,#ffe94d 64%,transparent 64%)}
 .lb-sora{background:#5fe3f0;color:#000;border-color:#000}
+.lb-none{background:#eceff1;color:#9aa5ab;border-color:#b0bec5;font-weight:700}   /* 所有をまだ確認していない家電 */
 .lb-dash{display:inline-block;width:16px;height:6px;border-radius:3px;background:#111;border:1px solid #fff}
 .kpin{display:inline-block;width:13px;height:13px;border-radius:50%;border:1.5px solid #000}
 .kstar svg{position:static;width:16px;height:16px;display:block}
@@ -1515,6 +1516,8 @@ const STAGE_NO = { 'チラシ':1, '推進':2, '見込み':3 };
 const staffColor = s => STAFF_COL[s] || GREY;
 const STAR = `<svg class="lb-star" viewBox="0 0 24 24"><path d="M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z" fill="#ffe94d" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 const glyph = (t, col, cls = '') => `<i class="lb-g ${cls}" style="color:${col}">${t}</i>`;
+// 所有の記録がない家電も同じ場所にうすい灰色で出す（どれを確認していないか分かるように）
+const noneBox = t => `<i class="lb-b lb-none">${t}</i>`;
 const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}${a.store === '他店' ? ' ta' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
@@ -1525,10 +1528,10 @@ function catalogPin(c) {
 }
 function labelHTML(c) {
   const row0 = [['tv','テ','テレビ'],['aircon','エ','エアコン'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
-    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
+    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : noneBox(t);
   }).join('');
   const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','熱','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
-    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : '';
+    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : noneBox(t);
   }).join('');
   let row2 = '';
   if (show.visit && c.visits.length) {
@@ -1539,7 +1542,7 @@ function labelHTML(c) {
   if (c.rfm && c.rfm !== '-') { if (show.rfm) row2 += rankMark(c); }
   else if (show.blank) row2 += c.rfm === '-' ? '<i class="lb-dash"></i>' : '<i class="lb-b lb-sora">空</i>';
   // 給湯器 sits right after the rank
-  if (show.heater) { const a = currentAppliance(c, '給湯器'); if (a) row2 += box('湯', a, '給湯器'); }
+  if (show.heater) { const a = currentAppliance(c, '給湯器'); row2 += a ? box('湯', a, '給湯器') : noneBox('湯'); }
   if (show.s && c.rank === 'S') row2 += glyph('S', '#2346f0', 'k');
   let row3 = '';
   if (show.contact) {
@@ -1632,6 +1635,7 @@ function renderLogoToggles() {
     row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
     row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
     row(box('湯', fresh, '給湯器') + box('湯', dummy, '給湯器'), '給湯器　水色＝15年以上・赤＝15年未満（ランクの右隣）') +
+    row(noneBox('冷') + noneBox('湯'), 'うすい灰色＝その家電の所有をまだ確認していない（記録なし）') +
     row(box('炊', { ...dummy, store: '他店' }, '炊飯器'), '右上の白い丸＝他店で買ったもの') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（下の日付以降に所有を確認）') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
