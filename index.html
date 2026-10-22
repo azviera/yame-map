@@ -642,11 +642,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #recForm h3{margin:0;font-size:17px}
 #recForm label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700}
 #recForm input,#recForm select,#recForm textarea{height:42px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 10px;font-size:16px;font-weight:400}
-#recForm .dateIn{display:flex;gap:6px;align-items:center}#recForm .dateIn input{flex:1;min-width:0}
-#recForm .dateBtn{height:42px;width:46px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:20px;flex:none;cursor:pointer}
+#recForm .dateIn{display:flex;gap:4px;align-items:center;min-width:0;width:100%}#recForm .dateIn input{flex:1 1 auto;min-width:0;width:auto}
+#recForm .dateBtn{height:42px;width:38px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:20px;flex:none;cursor:pointer}
 #recForm .dateHint{color:#c62828;font-weight:400;font-size:12px;min-height:0}#recForm input.bad{border-color:#c62828}
 #recForm textarea{height:64px;padding:8px 10px}
-#recForm .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#recForm .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}#recForm .two>label{min-width:0}#recForm .two input,#recForm .two select{width:100%;min-width:0}
 #recForm .seg{display:flex;gap:6px;flex-wrap:wrap}
 #recForm .seg label{flex-direction:row;align-items:center;gap:6px;font-weight:400;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 #recForm .seg input{height:auto}
