@@ -768,6 +768,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* detail card */
 #card{position:absolute;top:12px;right:12px;bottom:12px;width:360px;max-width:calc(100% - 24px);z-index:850;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
 #card .hd{padding:14px 16px 12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+#card .grab{display:none}
 #card .hd .who{flex:1;min-width:0}
 #card .nm{font-size:20px;font-weight:700;line-height:1.3}
 #card .code{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -808,6 +809,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #panelHead b{font-size:16px}
   #mapwrap{grid-column:1}
   #card{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:64%;border-radius:16px 16px 0 0;border-bottom:none;padding-bottom:env(safe-area-inset-bottom,0px)}
+  /* 上の棒を上下に引っぱって、詳細の大きさを変える（下の方＝小さく・標準・大きく） */
+  #card .grab{display:flex;justify-content:center;align-items:center;height:22px;flex:none;touch-action:none;cursor:grab}
+  #card .grab i{width:44px;height:5px;border-radius:3px;background:var(--line);display:block}
+  #card .grab+.hd{padding-top:4px}
+  #card.sized{max-height:none}
+  #card.snap{transition:height .22s ease}
   #legend{left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 }
 @media (prefers-reduced-motion:reduce){#panel{transition:none}}
@@ -1794,7 +1801,7 @@ function select(code, pan) {
   const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
   const q = c.lat != null ? `${c.lat},${c.lng}` : encodeURIComponent(c.addr);
-  $('#card').innerHTML = `
+  $('#card').innerHTML = `<div class="grab" title="上下に引っぱって大きさを変えられます"><i></i></div>
     <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}</div>
       <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff || '未接点')}${badge('stage', c.stage)}${badge('visit', c.vals.visit)}</div></div>
       <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
@@ -1810,7 +1817,7 @@ function select(code, pan) {
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
       <div class="blk"><h3>訪問確認（${c.visits.length}件）</h3>${hist(c.visits, 'まだ訪問の記録はありません')}</div>
     </div>`;
-  $('#card').hidden = false;
+  $('#card').hidden = false; if (matchMedia('(max-width:860px)').matches) applyCardMode();
   $('#closeCard').onclick = closeCard;
   $('#panel').classList.remove('open');
   // keep the chosen pin visible beside (PC) or above (phone) the card
@@ -1820,7 +1827,40 @@ function select(code, pan) {
     map.setView(map.unproject(map.project([c.lat, c.lng], z).add(off), z), z, { animate: false });
   }
 }
-function closeCard() { selected = null; $('#card').hidden = true; refresh(); }
+// 詳細の上の棒: 上へ引くと大きく（画面の9割）、下へ引くと小さく。離すと 小さく・標準・大きく のどれかにそろう。
+// 選んだ大きさは、このあと開くお客様にも使う（アプリを開き直すまで）
+let cardMode = 'mid';
+function cardSizes() { const h = document.getElementById('mapwrap').clientHeight; return { low: Math.round(h * 0.32), mid: Math.round(h * 0.64), high: Math.round(h * 0.92) }; }
+function applyCardMode() {
+  const el = $('#card'); el.classList.remove('snap');
+  if (cardMode === 'mid') { el.classList.remove('sized'); el.style.height = ''; }
+  else { el.classList.add('sized'); el.style.height = cardSizes()[cardMode] + 'px'; }
+}
+(() => {
+  const el = $('#card'); let y0 = 0, h0 = 0, dragging = false, pid = null;
+  el.addEventListener('pointerdown', e => {
+    if (!e.target.closest('.grab') || !matchMedia('(max-width:860px)').matches) return;
+    dragging = true; pid = e.pointerId; y0 = e.clientY; h0 = el.getBoundingClientRect().height;
+    el.classList.remove('snap'); el.classList.add('sized'); el.style.height = h0 + 'px';
+    try { e.target.closest('.grab').setPointerCapture(pid); } catch {}
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!dragging || e.pointerId !== pid) return;
+    const s = cardSizes(), h = Math.max(s.low - 80, Math.min(s.high, h0 + (y0 - e.clientY)));
+    el.style.height = h + 'px';
+  });
+  const up = e => {
+    if (!dragging || e.pointerId !== pid) return;
+    dragging = false;
+    const s = cardSizes(), h = el.getBoundingClientRect().height;
+    if (h < s.low - 50) { cardMode = 'mid'; closeCard(); el.style.height = ''; el.classList.remove('sized'); return; }   // 下まで引いたら閉じる
+    cardMode = [['low', s.low], ['mid', s.mid], ['high', s.high]].reduce((b, x) => Math.abs(x[1] - h) < Math.abs(b[1] - h) ? x : b)[0];
+    el.classList.add('snap'); el.style.height = s[cardMode] + 'px';
+    if (cardMode === 'mid') setTimeout(() => { if (cardMode === 'mid') { el.classList.remove('sized', 'snap'); el.style.height = ''; } }, 240);
+  };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+})();function closeCard() { selected = null; $('#card').hidden = true; refresh(); }
 
 /* ---------- events ---------- */
 let toastT;
