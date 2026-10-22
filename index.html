@@ -1387,7 +1387,8 @@ function fitSatelliteZoom() {
     });
   } catch { apply(SAT_FALLBACK_ZOOM); }
 }
-map.on('moveend', () => { if (baseKey === 'gsat') fitSatelliteZoom(); });
+let satAsked = 0;
+map.on('moveend', () => { if (baseKey === 'gsat' && Date.now() - satAsked > 5000) { satAsked = Date.now(); fitSatelliteZoom(); } });
 // 指1本で拡大・縮小（Googleマップのアプリと同じ）: 2回目のタップでそのまま指を置き、下へ動かすと拡大・上へ動かすと縮小。
 // 動かさずに離せば、今まで通りの「ダブルタップで拡大」
 (() => {
@@ -2527,9 +2528,36 @@ function showMe(p) {
   if (!meDot) {
     meRing = L.circle(ll, { radius: acc, color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
     meDot = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1, interactive: false }).addTo(map);
-  } else { meDot.setLatLng(ll); meRing.setLatLng(ll).setRadius(acc); }
-  if (meCentre) { meCentre = false; meFollowMove(() => map.setView(ll, Math.max(map.getZoom(), 16))); }
-  else if (meFollow) meFollowMove(() => map.panTo(ll, { animate: true, duration: 0.6, noMoveStart: true }));
+  } else meRing.setRadius(acc);
+  if (meCentre) { meCentre = false; meAnim = null; meDot.setLatLng(ll); meRing.setLatLng(ll); meFollowMove(() => map.setView(ll, Math.max(map.getZoom(), 16))); return; }
+  meGlide(L.latLng(ll), acc <= 50);
+}
+// 位置は1秒ごとくらいに届くので、前の位置から次の位置まで、その間をなめらかに動かす（点も地図も）。
+// 動かしている間は地図を「ずらすだけ」にして印は描き直さず、1回動き終わるごとに1回だけ画面の更新を知らせる
+let meAnim = null, meRaf = 0, meLastFix = 0, meLastEnd = 0;
+function meGlide(to, camOk) {
+  const now = performance.now(), from = meDot.getLatLng();
+  if (from.distanceTo(to) < 3 && !meAnim) { meLastFix = now; return; }   // 止まっているときの小さなぶれは無視
+  const cur = meAnim ? meDot.getLatLng() : from;
+  const dur = Math.min(1500, Math.max(400, meLastFix ? now - meLastFix : 1000));
+  meLastFix = now;
+  meAnim = { from: cur, to, t0: now, dur, cam: camOk };
+  if (!meRaf) meRaf = requestAnimationFrame(meStep);
+}
+function meStep() {
+  meRaf = 0;
+  const a = meAnim; if (!a) return;
+  const k = Math.min(1, (performance.now() - a.t0) / a.dur);
+  const ll = L.latLng(a.from.lat + (a.to.lat - a.from.lat) * k, a.from.lng + (a.to.lng - a.from.lng) * k);
+  meDot.setLatLng(ll); meRing.setLatLng(ll);
+  if (meFollow && a.cam) {
+    const off = map.latLngToContainerPoint(ll).subtract(map.getSize().divideBy(2));
+    if (Math.abs(off.x) > 0.3 || Math.abs(off.y) > 0.3) { map._rawPanBy(off); map.fire('move'); }
+    // 走り続けていても、2秒に1回は地図の更新（足りない地図の絵・お客様の印）を知らせる
+    if (performance.now() - meLastEnd > 2000) { meLastEnd = performance.now(); map.fire('moveend'); }
+  }
+  if (k < 1) meRaf = requestAnimationFrame(meStep);
+  else { meAnim = null; if (meFollow && a.cam) { meLastEnd = performance.now(); map.fire('moveend'); } }
 }
 // 追いかけ: 現在地ボタンを押すと、車で移動しても地図が現在地についてくる。地図にさわると追いかけは止まる（青い点は動き続ける）
 let meFollow = false, meMoving = false;
