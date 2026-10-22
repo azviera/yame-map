@@ -740,7 +740,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .lb-g.w{-webkit-text-stroke:3px #fff}
 .lb-g.dg{font-size:14px}
 .lb-b.ta{position:relative}.lb-b.ta::after{content:"";position:absolute;right:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #000}
-.lb-b.maru{background-image:linear-gradient(transparent 36%,#ffe94d 36%,#ffe94d 64%,transparent 64%)}
+.lb-b.maru{position:relative}   /* 所有を確認: 右下に黄色い丸と✓（右上の白い丸＝他店と区別） */
+.lb-b.maru::before{content:"✓";position:absolute;right:-6px;bottom:-6px;width:10px;height:10px;border-radius:50%;background:#ffd400;border:1.5px solid #000;color:#000;font-size:8px;line-height:10px;font-weight:900;text-align:center;box-sizing:content-box}
 .lb-sora{background:#5fe3f0;color:#000;border-color:#000}
 .lb-none{background:#eceff1;color:#9aa5ab;border-color:#b0bec5;font-weight:700}   /* 所有をまだ確認していない家電 */
 .lb-dash{display:inline-block;width:16px;height:6px;border-radius:3px;background:#111;border:1px solid #fff}
@@ -751,6 +752,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .keyrow{display:grid;grid-template-columns:96px 1fr;align-items:start;gap:8px;font-size:12px}
 .keyrow .ic{display:flex;gap:2px;justify-content:flex-end}
 .keyrow .lb-b,.keyrow .lb-dg{position:static}
+.keyrow .lb-b.ta,.keyrow .lb-b.maru{position:relative}   /* 見方の欄でも白い丸・黄色い✓を見せる */
+.keyrow .ic{padding:4px 6px 5px 0}
 .widesel{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:13px;font-weight:700}
 .widesel select{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
 .logo-chip{display:inline-flex;align-items:center;gap:6px}
@@ -869,8 +872,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
           <option value="visit">訪問</option>
           <option value="all">拡大時と同じ全部のアイコン</option>
         </select></div>
-      <div class="widesel"><label for="checkSince">黄色の帯：この日以降に確認したもの</label>
-        <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色の帯の基準日"></div></div>
+      <div class="widesel"><label for="checkSince">黄色い✓：この日以降に確認したもの</label>
+        <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色い✓の基準日"></div></div>
       <div class="row" style="margin-bottom:8px"><button class="btn" id="logoAll" type="button">すべてチェック</button><button class="btn" id="logoNone" type="button">すべて外す</button></div>
       <div class="chips" id="logoToggles"></div>
       <div class="lkey" id="logoKey"></div>
@@ -1638,7 +1641,7 @@ function renderLogoToggles() {
     row(box('湯', fresh, '給湯器') + box('湯', dummy, '給湯器'), '給湯器　水色＝15年以上・赤＝15年未満（ランクの右隣）') +
     row(noneBox('冷') + noneBox('湯'), 'うすい灰色＝その家電の所有をまだ確認していない（記録なし）') +
     row(box('炊', { ...dummy, store: '他店' }, '炊飯器'), '右上の白い丸＝他店で買ったもの') +
-    row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '黄色の帯＝○（下の日付以降に所有を確認）') +
+    row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '右下の黄色い✓＝下の日付以降に所有を確認') +
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
@@ -2017,7 +2020,7 @@ async function odSaveSettings() {
       if (!res.ok) { const e = new Error(`設定を保存できませんでした（${res.status}）`); e.status = res.status; throw e; }
     });
     if (r.needLogin) { lsSet('yame-od-pending', 'savecfg'); await odLogin(); return; }
-    toast('黄色の帯の日付を保存しました。皆さんの画面にも反映されます', 4000);
+    toast('黄色い✓の日付を保存しました。皆さんの画面にも反映されます', 4000);
   } catch (e) { toast(e.message, 8000); }
 }
 async function odFolderChildrenRaw(token) {
