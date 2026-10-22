@@ -604,6 +604,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
   --pin-stroke:#10171c; --shadow:0 6px 24px rgba(0,0,0,.45); color-scheme:dark }
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;overflow:hidden}
+/* iPhoneで縦横を回しても画面がずれないように: 画面全体を画面にぴったり固定し、上の切り欠き分は #app の内側でよける */
+html{padding:0!important;overflow:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{position:fixed;inset:0;height:auto;width:auto}
+#app{padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -800,6 +804,14 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #legend{left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 }
 @media (prefers-reduced-motion:reduce){#panel{transition:none}}
+/* スマホを横にしたとき: 上の帯を1行にして、地図を広く */
+@media (max-width:960px) and (orientation:landscape) and (max-height:500px){
+  #top{flex-wrap:nowrap;padding-block:4px;gap:8px}
+  #searchWrap{order:0;flex:1 1 160px}
+  #search{height:34px}
+  #brand .txt{display:none}
+  #dim{max-width:28vw}
+}
 </style>
 
 <div id="app">
@@ -2498,6 +2510,10 @@ $('#meBtn').addEventListener('click', () => {
   if (meDot) { meCentre = false; meFollowMove(() => map.setView(meDot.getLatLng(), Math.max(map.getZoom(), 16))); }
   if (meWatch == null || meWatch === 'paused') meWatch = navigator.geolocation.watchPosition(showMe, meError, ME_OPTS);
 });
+// 縦横を回したとき: iPhoneが画面を少しずらしたままにすることがあるので元に戻し、地図の大きさを測り直す
+const fixViewport = () => { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; setTimeout(() => map.invalidateSize(), 250); };
+window.addEventListener('orientationchange', () => setTimeout(fixViewport, 50));
+window.addEventListener('resize', fixViewport);
 // メニューのボタンはもう一度押すと閉じる。地図をタップしても閉じる（スマホ・タブレットの下から出るメニュー）
 function toggleMenu(open) { $('#panel').classList.toggle('open', open); $('#openPanel').textContent = open ? 'メニューを閉じる' : 'メニュー'; }
 $('#openPanel').addEventListener('click', () => toggleMenu(!$('#panel').classList.contains('open')));
