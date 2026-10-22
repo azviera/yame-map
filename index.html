@@ -902,14 +902,14 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div class="seg" id="rfKind">
       <label><input type="checkbox" name="kind" value="お店誌">お店誌を渡した</label>
       <label><input type="checkbox" name="kind" value="訪問">訪問した</label>
-      <label><input type="checkbox" name="kind" value="所有確認">新しく見つけた家電</label>
+      <label><input type="checkbox" name="kind" value="所有確認"><span id="rfApplTxt">新しく見つけた家電</span></label>
       <label><input type="checkbox" name="kind" value="Aチラシ">1 チラシ</label>
       <label><input type="checkbox" name="kind" value="B推進">2 推進</label>
       <label><input type="checkbox" name="kind" value="C見込み">3 見込み</label>
     </div>
     <div id="rfKindHint">いくつでも選べます（まとめて1回の「保存」で記録）。「新しく見つけた家電」はひとつだけで記録します</div>
     <div class="two">
-      <label>日付<span class="dateIn"><input name="date" data-date required inputmode="numeric" autocomplete="off" placeholder="例 20261021"><button type="button" class="dateBtn" aria-label="カレンダーで選ぶ">📅</button></span><small class="dateHint"></small></label>
+      <label><span id="rfDateTxt">日付</span><span class="dateIn"><input name="date" data-date required inputmode="numeric" autocomplete="off" placeholder="例 20261021"><button type="button" class="dateBtn" aria-label="カレンダーで選ぶ">📅</button></span><small class="dateHint"></small></label>
       <label>担当者<select name="staff"><option>ト</option><option>タ</option><option>テ</option><option>ヤ</option><option>ミ</option></select></label>
     </div>
     <div class="applOnly">
@@ -2299,13 +2299,19 @@ const selKinds = () => [...$('#recForm form').querySelectorAll('input[name="kind
 function showApplFields() {
   const f = $('#recForm form');
   const ks = selKinds(), isAppl = ks.includes('所有確認');
+  const ex = !!(f.elements.origModel.value || f.elements.origDate.value);   // 店クラウドVに登録済みの家電の確認・変更
   $('#recForm .applOnly').hidden = !isAppl;
   // 「新しく見つけた家電」を選んだら それだけ、ほかを選んだら「新しく見つけた家電」を隠す。何も選んでいなければ全部出す
   for (const x of $('#rfKind').querySelectorAll('input[name="kind"]'))
     x.closest('label').hidden = ks.length > 0 && (isAppl ? x.value !== '所有確認' : x.value === '所有確認');
-  $('#rfKindHint').textContent = isAppl ? '「新しく見つけた家電」を記録します（外すと、ほかの種類を選べます）'
+  // 登録済みの家電では「新しく見つけた家電」とは出さず、ほかの種類にも切り替えさせない（記録の種類は同じ「所有確認」）
+  $('#rfApplTxt').textContent = ex ? '登録済みの家電の確認' : '新しく見つけた家電';
+  $('#rfKind').querySelector('input[value="所有確認"]').disabled = ex;
+  $('#rfKindHint').textContent = ex ? '店クラウドVに登録済みの家電の確認・変更を記録します'
+    : isAppl ? '「新しく見つけた家電」を記録します（外すと、ほかの種類を選べます）'
     : 'いくつでも選べます（まとめて1回の「保存」で記録）';
-  const ex = !!(f.elements.origModel.value || f.elements.origDate.value);
+  // 家電の記録の「日付」は、その家電を確かめた日（店クラウドVでは廃棄日に入る）
+  $('#rfDateTxt').textContent = isAppl ? '確認した日' : '日付';
   $('#recForm .exOnly').hidden = !ex;
   // a registered appliance keeps its 納品日; a new find is entered with the year it was made
   $('#recForm .yearOnly').hidden = ex; $('#recForm .dlvOnly').hidden = !ex;
@@ -2382,6 +2388,9 @@ $('#recForm form').addEventListener('submit', e => {
     return;
   }
   const kind = '所有確認';
+  { const cd = f.elements.date.value, dl = f.elements.dlv.value, old = new Date(Date.now() - 31 * 864e5).toISOString().slice(0, 10);
+    if (dl && cd < dl && !confirm(`「確認した日」（${cd}）が納品日（${dl}）より前です。確認した日は、その家電を見て確かめた日です。このまま保存しますか？`)) return;
+    if (cd < old && !confirm(`「確認した日」が1か月以上前（${cd}）です。店クラウドVでは、この日が廃棄日の欄（確認日）に入ります。このまま保存しますか？`)) return; }
   const rec = { id: recEditing.id || newId(), kind, date: f.elements.date.value, staff: f.elements.staff.value, code: c.code, name: c.name,
     memo: f.elements.memo.value.trim(), writer: writerId, at: new Date().toISOString() };
   if (kind === '所有確認') Object.assign(rec, { appl: f.elements.appl.value, pcode: f.elements.pcode.value, maker: f.elements.maker.value, model: f.elements.model.value.trim().normalize('NFKC').toUpperCase(),
