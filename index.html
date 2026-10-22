@@ -791,7 +791,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #panel{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:82%;border-right:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
     padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(105%);transition:transform .22s ease;z-index:1500}
   #panel.open{transform:none}
-  #panelHead{display:flex;justify-content:space-between;align-items:center}
+  #panelHead{display:flex;justify-content:space-between;align-items:center;position:sticky;top:-14px;z-index:5;background:var(--surface);margin:-14px -16px 0;padding:12px 16px 10px;border-bottom:1px solid var(--line)}   /* 下まで見ても「閉じる」が上に残る */
   #panelHead b{font-size:16px}
   #mapwrap{grid-column:1}
   #card{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:64%;border-radius:16px 16px 0 0;border-bottom:none;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -1678,7 +1678,7 @@ function refresh() {
   const sel = selected && markers.get(selected); if (sel && map.hasLayer(sel)) sel.bringToFront();
   $('#shown').textContent = shown.toLocaleString();
   $('#total').textContent = customers.size.toLocaleString();
-  $('#openPanel').textContent = 'メニュー';
+  $('#openPanel').textContent = $('#panel').classList.contains('open') ? 'メニューを閉じる' : 'メニュー';
   renderLegend(); renderFilters(); renderList();
 }
 function fitAll() {
@@ -1844,7 +1844,7 @@ const OD = {
   folder: 'azyame/日計・在庫/店長ABC管理ｔ/Googleマイマップ',
   sharedBase: 'https://azyame-my.sharepoint.com/personal/az-yame_azyame_onmicrosoft_com/Documents/',
 };
-function openPanelIfPhone() { $('#panel').classList.add('open'); }
+function openPanelIfPhone() { $('#panel').classList.add('open'); $('#openPanel').textContent = 'メニューを閉じる'; }
 const odReady = () => OD.client && OD.tenant && location.origin + location.pathname === OD.redirect;
 // only the owner (matched by account hash) gets the data buttons; everyone else signs in and just sees the latest map.
 // This only shapes the screen: what anyone can read is decided by their OneDrive sharing.
@@ -2482,10 +2482,13 @@ $('#meBtn').addEventListener('click', () => {
   if (meWatch == null) meWatch = navigator.geolocation.watchPosition(showMe, meError, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
   else navigator.geolocation.getCurrentPosition(showMe, meError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
 });
-$('#openPanel').addEventListener('click', () => { $('#panel').classList.add('open'); });
-$('#closePanel').addEventListener('click', () => $('#panel').classList.remove('open'));
+// メニューのボタンはもう一度押すと閉じる。地図をタップしても閉じる（スマホ・タブレットの下から出るメニュー）
+function toggleMenu(open) { $('#panel').classList.toggle('open', open); $('#openPanel').textContent = open ? 'メニューを閉じる' : 'メニュー'; }
+$('#openPanel').addEventListener('click', () => toggleMenu(!$('#panel').classList.contains('open')));
+$('#closePanel').addEventListener('click', () => toggleMenu(false));
+map.on('click', () => { if ($('#panel').classList.contains('open')) toggleMenu(false); });
 map.on('click', () => { if (selected) closeCard(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCard(); $('#panel').classList.remove('open'); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCard(); toggleMenu(false); } });
 // dragging files onto the page (PC)
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer?.files?.length) importFiles([...e.dataTransfer.files]); });
