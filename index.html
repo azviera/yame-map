@@ -709,6 +709,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .mapbtns .btn{box-shadow:var(--shadow);font-size:13px;height:34px}
 .mapbtns .mebtn{width:44px;height:44px;padding:0;display:grid;place-items:center;background:#fff;border-color:#dadce0;border-radius:8px}
 .mapbtns .mebtn:hover{background:#f1f3f4}
+.mapbtns .mebtn.following{background:#1a73e8;border-color:#1a73e8}   /* 追いかけ中は青 */
+.mapbtns .mebtn.following svg circle:first-child{fill:#fff}
 #app.nopanel{grid-template-columns:0 1fr}
 #app.nopanel #panel{display:none}
 .store-icon{background:var(--ink);color:var(--surface);font-weight:700;font-size:14px;width:30px!important;height:30px!important;border-radius:6px;display:grid;place-items:center;border:2px solid var(--surface);box-shadow:var(--shadow)}
@@ -2468,8 +2470,23 @@ function showMe(p) {
     meRing = L.circle(ll, { radius: acc, color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
     meDot = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1, interactive: false }).addTo(map);
   } else { meDot.setLatLng(ll); meRing.setLatLng(ll).setRadius(acc); }
-  if (meCentre) { meCentre = false; map.setView(ll, Math.max(map.getZoom(), 16)); }
+  if (meCentre) { meCentre = false; meFollowMove(() => map.setView(ll, Math.max(map.getZoom(), 16))); }
+  else if (meFollow) meFollowMove(() => map.panTo(ll, { animate: true, duration: 0.6, noMoveStart: true }));
 }
+// 追いかけ: 現在地ボタンを押すと、車で移動しても地図が現在地についてくる。地図にさわると追いかけは止まる（青い点は動き続ける）
+let meFollow = false, meMoving = false;
+function meFollowMove(fn) { meMoving = true; fn(); setTimeout(() => { meMoving = false; }, 700); }
+function setFollow(on) { meFollow = on; $('#meBtn').classList.toggle('following', on); }
+const stopFollow = () => { if (meFollow) setFollow(false); };
+map.on('dragstart', stopFollow);
+map.on('zoomstart', () => { if (!meMoving) stopFollow(); });
+for (const ev of ['touchstart', 'wheel', 'mousedown']) map.getContainer().addEventListener(ev, stopFollow, { passive: true });
+// 画面を見ていないとき（ほかのアプリ・画面を消したとき）は位置の取得を止めて電池を守る。戻ったら続きから
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (meWatch != null) { navigator.geolocation.clearWatch(meWatch); meWatch = 'paused'; } }
+  else if (meWatch === 'paused') meWatch = navigator.geolocation.watchPosition(showMe, meError, ME_OPTS);
+});
+const ME_OPTS = { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 };
 function meError(e) {
   meCentre = false;
   toast(e.code === 1 ? '現在地の利用が許可されていません。iPhoneの「設定」→「プライバシーとセキュリティ」→「位置情報サービス」→「Safari」で「使用中のみ」にしてください。'
@@ -2477,10 +2494,9 @@ function meError(e) {
 }
 $('#meBtn').addEventListener('click', () => {
   if (!navigator.geolocation) { toast('この画面では現在地を使えません。', 4000); return; }
-  meCentre = true;
-  if (meDot) map.setView(meDot.getLatLng(), Math.max(map.getZoom(), 16));
-  if (meWatch == null) meWatch = navigator.geolocation.watchPosition(showMe, meError, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
-  else navigator.geolocation.getCurrentPosition(showMe, meError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  meCentre = true; setFollow(true);
+  if (meDot) { meCentre = false; meFollowMove(() => map.setView(meDot.getLatLng(), Math.max(map.getZoom(), 16))); }
+  if (meWatch == null || meWatch === 'paused') meWatch = navigator.geolocation.watchPosition(showMe, meError, ME_OPTS);
 });
 // メニューのボタンはもう一度押すと閉じる。地図をタップしても閉じる（スマホ・タブレットの下から出るメニュー）
 function toggleMenu(open) { $('#panel').classList.toggle('open', open); $('#openPanel').textContent = open ? 'メニューを閉じる' : 'メニュー'; }
