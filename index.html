@@ -704,7 +704,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .chip.off .dot{background:transparent!important}
 .chip .dot.ring{border:2.5px solid #fff!important;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000!important}
 .chip.off .dot.ring{opacity:.45}
-.lb-pin.ring{background:transparent;border:3px solid #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000}
+.lb-pin.ring{background:transparent;border:2px solid #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000}   /* ほかの丸と同じ外径 */
 .fgroup{display:flex;flex-direction:column;gap:6px}
 .fgroup + .fgroup{margin-top:12px}
 .fgroup .t{font-size:13px;font-weight:700}
@@ -1606,7 +1606,10 @@ let hidden = {}; for (const k in DIMS) hidden[k] = new Set();
 let query = '';
 let selected = null;
 
-const LABEL_ZOOM = 16;   // ここより引いた地図（市街地が1.5km以上入る）が「広域」
+// 全部のアイコンはズーム19から。18以下（1画素が約0.5m以上。市街地で家どうしが30〜40画素しか離れず、アイコンが重なる）は「広域」。
+// 重なるかどうかは画面の幅でなく1画素あたりの距離で決まるので、スマホもPCも同じ番号
+const LABEL_ZOOM = 19;
+const DOT_FULL_ZOOM = 15;   // 色の点・広域のアイコンが一番大きくなるズーム
 const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
   { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
@@ -1767,10 +1770,9 @@ function renderLogoToggles() {
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
-// icons shrink as the map zooms out. From LABEL_ZOOM they grow by a quarter over two zoom levels:
-// bigger where houses are far apart on screen, the same size as before where icons first appear (so no extra overlap)
-const dotScale = () => { const z = map.getZoom(); return z >= LABEL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (LABEL_ZOOM - z) * 0.08); };
-const iconScale = () => { const z = map.getZoom(); return z <= LABEL_ZOOM ? dotScale() : 0.65 * (1 + 0.125 * Math.min(2, z - LABEL_ZOOM)); };
+// dots and 広域 icons shrink as the map zooms out; the full icons (from LABEL_ZOOM, where houses are far apart on screen) are a quarter bigger
+const dotScale = () => { const z = map.getZoom(); return z >= DOT_FULL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (DOT_FULL_ZOOM - z) * 0.08); };
+const iconScale = () => map.getZoom() < LABEL_ZOOM ? dotScale() : 0.8125;
 const applyIconScale = () => $('#map').style.setProperty('--s', iconScale());
 applyIconScale();
 map.on('zoomend', () => { applyIconScale(); refresh(); });
@@ -1791,11 +1793,11 @@ function styleFor(c) {
   const sel = selected === c.code;
   // every dot of a colour looks the same (S rank is shown by its own icon, not a different ring)
   const k = Math.max(0.45, dotScale());
-  const ring = isRing(dim, c.vals[dim]);
-  // a ring needs a hole to read as a ring: at least 5px radius; weight = the black edge (the white line is half of it)
-  if (ring) return { radius: Math.max(5, (sel ? 11 : 7) * k), weight: sel ? 6 : 4, ring, fillOpacity: 0, renderer };
-  return { radius: (sel ? 11 : 7) * k, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
-    color: sel ? css('--ink') : css('--pin-stroke'), weight: sel ? 3 : 1.5, ring, renderer };
+  const ring = isRing(dim, c.vals[dim]), r = (sel ? 11 : 7) * k, w = sel ? 3 : 1.5;
+  // the ring has the same outer size as the other dots (radius + half the edge); weight = its black edge, the white line is half of it
+  if (ring) { const rw = sel ? 4 : 2.4; return { radius: Math.max(2, r + w / 2 - rw / 2), weight: rw, ring, fillOpacity: 0, renderer }; }
+  return { radius: r, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
+    color: sel ? css('--ink') : css('--pin-stroke'), weight: w, ring, renderer };
 }
 function rebuild(fit) {
   for (const m of markers.values()) map.removeLayer(m);
