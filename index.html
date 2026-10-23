@@ -1993,13 +1993,17 @@ const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null');
 const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const odAuthBase = () => `https://login.microsoftonline.com/${OD.tenant}/oauth2/v2.0`;
-async function odLogin() {
+async function odLogin(opts = {}) {   // opts.silent: 画面を出さずに（Microsoftに残っているサインインで）入り直す
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
   lsSet('yame-od-pkce', { verifier, state }); lsSet('yame-login-at', Date.now());
   const q = new URLSearchParams({ client_id: OD.client, response_type: 'code', redirect_uri: OD.redirect, response_mode: 'query',
-    scope: OD.scope, state, code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account' });
+    scope: OD.scope, state, code_challenge: challenge, code_challenge_method: 'S256' });
+  // 前にサインインした人の名前を渡して、アカウントを選び直さなくてよいように。名前が分からないときだけ選ぶ画面を出す
+  const hint = lsGet('yame-od-user');
+  if (hint) q.set('login_hint', hint);
+  if (opts.silent) q.set('prompt', 'none'); else if (!hint) q.set('prompt', 'select_account');
   location.href = `${odAuthBase()}/authorize?${q}`;
 }
 // a refresh asks only for what this device was already given (a read-only sign-in must not fail just because the app now also asks to write)
@@ -2013,6 +2017,7 @@ async function odTokenRequest(params) {
   const j = await r.json();
   if (!r.ok) throw new Error(j.error_description || j.error || 'サインインに失敗しました');
   const tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 120) * 1000, scope: j.scope || '' };
+  if (j.id_token) { try { const pl = JSON.parse(decodeURIComponent(escape(atob(j.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); if (pl.preferred_username) lsSet('yame-od-user', pl.preferred_username); } catch {} }
   lsSet('yame-od-tok', tok);
   return tok;
 }
@@ -2542,13 +2547,26 @@ $('#odBtn').addEventListener('click', () => {
   }
   odShowList();
 });
-// back from the Microsoft sign-in page
+// 開いたときにサインインの期限（Microsoftの決まりで約1日）が切れていたら、画面を出さずに自動で入り直す。
+// Microsoft側にサインインが残っていれば、一瞬ページが読み直されるだけで済む（アカウントを選ぶ必要なし）。10分に1回まで
+(async () => {
+  const q = new URLSearchParams(location.search);
+  if (q.has('code') || q.has('error') || !odReady() || !lsGet('yame-od-user') || !lsGet('yame-od-tok')) return;
+  if (await odToken()) return;   // まだ使える
+  if (Date.now() - (lsGet('yame-silent-at') || 0) < 600000) return;
+  lsSet('yame-silent-at', Date.now()); lsSet('yame-od-pending', 'silent');
+  await odLogin({ silent: true });
+})();// back from the Microsoft sign-in page
 (async () => {
   const q = new URLSearchParams(location.search);
   if (!q.has('code') && !q.has('error')) return;
   history.replaceState(null, '', location.pathname);
   const p = lsGet('yame-od-pkce'); lsSet('yame-od-pkce', null);
-  if (q.has('error')) { toast('サインインできませんでした：' + (q.get('error_description') || q.get('error')), 8000); return; }
+  if (q.has('error')) {
+    const silent = lsGet('yame-od-pending') === 'silent';
+    if (silent && /login_required|interaction_required|consent_required/.test(q.get('error'))) { lsSet('yame-od-pending', null); toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」（または「OneDriveから最新を読み込む」）を押してサインインし直してください', 8000); return; }
+    toast('サインインできませんでした：' + (q.get('error_description') || q.get('error')), 8000); return;
+  }
   if (!p || p.state !== q.get('state') || !odReady()) return;
   try {
     const tok = await odTokenRequest({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: p.verifier });
@@ -2556,7 +2574,7 @@ $('#odBtn').addEventListener('click', () => {
     const pending = lsGet('yame-od-pending'); lsSet('yame-od-pending', null);
     if (role === 'owner') {
       if (pending === 'savecfg') odSaveSettings();
-      else if (pending === 'recflush') recLoad();
+      else if (pending === 'recflush' || pending === 'silent') recLoad();
       else if (pending) { openPanelIfPhone(); odShowList(); }
     }
     else odViewerLoad(false);
