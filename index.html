@@ -635,6 +635,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .reclist li{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed var(--line)}
 .reclist .d{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .reclist .t{flex:1;min-width:0}
+.holdtag{display:inline-block;background:#d97706;color:#fff;border-radius:4px;padding:0 5px;font-size:11px;font-weight:700;margin-left:4px;white-space:nowrap}
 .reclist .ops{display:flex;gap:4px}
 .reclist .ops button{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;font-size:12px;padding:2px 6px;cursor:pointer}
 .recstate{font-size:12px;color:var(--muted)}
@@ -1849,11 +1850,12 @@ function select(code, pan) {
     const n = Math.max(cn ? cn.n || 0 : 0, units.length);
     const cntTxt = cn && n ? `全${n}台（自店${cn.own || 0}・他店${cn.other || 0}）` : `全${n}台`;
     const more = n > 1 ? `<button type="button" class="acount" data-aunits="${esc(cat)}">${cntTxt} ▼</button><div class="aunits" data-units="${esc(cat)}" hidden>${
-      [...units].sort((x, y) => (y.date || 0) - (x.date || 0)).map((u, i) => `<div class="aunit"><b>${i + 1}</b> ${esc(u.model) || '（型式なし）'}<br>${whenOf(u)}${u.place ? '・' + esc(u.place) : ''}${u.date ? '・' + fmtAge(u.date) : ''}${seenOf(u) ? '<br>' + seenOf(u) : ''}${chkBtn(cat, u)}</div>`).join('')
+      [...units].sort((x, y) => (y.date || 0) - (x.date || 0)).map((u, i) => `<div class="aunit"><b>${i + 1}</b> ${esc(u.model) || '（型式なし）'}<br>${whenOf(u)}${u.place ? '・' + esc(u.place) : ''}${u.hold ? HOLD_TAG : ''}${u.date ? '・' + fmtAge(u.date) : ''}${seenOf(u) ? '<br>' + seenOf(u) : ''}${chkBtn(cat, u)}</div>`).join('')
       }${n > units.length ? `<div class="aunit">店クラウドVには${n}台あります（地図には${units.length}台分の詳細）。残りは店クラウドVで確認してください</div>` : ''}</div>` : cn && cn.other ? '他店で購入' : '';
     if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし${n ? '<br>' + more : ''}</span><span></span>`;
     const seen = seenOf(a) ? '<br>' + seenOf(a) : '';
-    const info = a.date ? `${esc(a.model)}<br>${whenOf(a)}${a.place ? '・' + esc(a.place) : ''}` : '納品記録なし';
+    const info = (a.date ? `${esc(a.model)}<br>${whenOf(a)}${a.place ? '・' + esc(a.place) : ''}` : a.hold ? esc(a.model) || '（型式なし）' : '納品記録なし')
+      + (a.hold || units.some(u => u.hold) ? HOLD_TAG : '');   // a held unit behind 全n台 ▼ is flagged on the main line too
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
     return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}${chkBtn(cat, a)}${more ? '<br>' + more : ''}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
@@ -2238,11 +2240,14 @@ function applyRecords() {
           same.place = r.place || ''; if (r.store) same.store = r.store;
         }
       } else if (r.status && r.status !== '使用中') { /* 処分 of something not on file: nothing to show */ }
-      else list.push({ model: r.model || '', date: r.year ? new Date(+r.year, 0, 1) : null, place: r.place || '', store: r.store || '', checked: d, maru: false, fromRec: true });
+      else list.push({ model: r.model || '', date: r.year ? new Date(+r.year, 0, 1) : null, place: r.place || '', store: r.store || '', checked: d, maru: false, fromRec: true, hold: recHold(r) });
     }
   }
   finalize();
 }
+// 新しく見つけた家電で製造年（納品日）が空: 店クラウドVには入れずに保留。直すで製造年を入れるとふつうに戻る
+const recHold = r => r.kind === '所有確認' && !r.status && !r.origModel && !r.origDate && !r.dlv && !/^\d{4}$/.test(r.year || '');
+const HOLD_TAG = '<b class="holdtag">保留・製造年を確認</b>';
 function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
 function recListHTML(code) {
   const { recs, done } = computeRecords();
@@ -2253,7 +2258,7 @@ function recListHTML(code) {
   if (!list.length) return `<div class="empty" style="margin-top:6px">${mine.length ? '記録はすべて店クラウドVに入力済みです' : 'この地図からの記録はまだありません'}</div>`;
   return `<ul class="reclist">${list.map(r => {
     const what = r.kind === '所有確認' ? `${r.status ? '【' + esc(r.status) + '】' : '【新しく見つけた】'}${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.dlv ? '・' + esc(r.dlv.replace(/-/g, '/')) + '納品' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
-    const tags = (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
+    const tags = (recHold(r) && !done.has(r.id) ? ' ' + HOLD_TAG : '') + (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
     const ops = r.writer === writerId ? `<span class="ops"><button type="button" data-redit="${esc(r.id)}">直す</button><button type="button" data-rdel="${esc(r.id)}">消す</button></span>` : '';
     return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
   }).join('')}</ul>`;
@@ -2506,7 +2511,7 @@ $('#recForm form').addEventListener('submit', e => {
   lsSet('yame-rec-staff', rec.staff);
   $('#recForm').hidden = true;
   recAdd({ op: 'put', rec });
-  toast('記録しました', 2000);
+  toast(recHold(rec) ? '記録しました。製造年が空なので保留になります。わかったら直してください' : '記録しました', recHold(rec) ? 6000 : 2000);
 });
 $('#card').addEventListener('click', e => {
   const b = e.target.closest('[data-rec],[data-redit],[data-rdel],[data-acheck],[data-aunits]'); if (!b || !selected) return;
