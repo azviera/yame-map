@@ -806,9 +806,15 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 @media (max-width:860px){
   #app{grid-template-columns:1fr}
   #panelToggle{display:none}
-  #searchWrap{order:3;flex:1 1 100%}
-  #brand .txt{display:none}
-  #dim{max-width:52vw}
+  /* 1行に: 検索窓・メニュー・色分け（地図を広く） */
+  #top{flex-wrap:nowrap;gap:6px;padding-block:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+  #brand{display:none}
+  #searchWrap{order:0;flex:1 1 auto}
+  #hits{right:auto;width:calc(100vw - 20px)}
+  #search:placeholder-shown{padding-right:8px;padding-left:10px}   /* 空のときは×が出ないので、案内の文字を広く */
+  #openPanel{order:1;padding-inline:10px;flex:none}
+  .colorby{order:2;flex:none}
+  #dim{width:92px;font-size:13px;padding:0 2px 0 6px;text-overflow:ellipsis}
   .colorby label{display:none}
   #openPanel{display:inline-block}
   #loadTop{display:none}
@@ -1935,6 +1941,9 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#searchWrap')) $('#hits').hidden = true;
 });
 $('#search').addEventListener('focus', renderList);
+// スマホでは検索窓が狭いので、短い案内に
+{ const mq = matchMedia('(max-width:860px)'), setPh = () => { $('#search').placeholder = mq.matches ? '名前・番号で探す' : '名前・電話番号の下4桁・顧客番号で探す'; };
+  setPh(); mq.addEventListener?.('change', setPh); }
 $('#dim').addEventListener('change', e => { dim = e.target.value; try { localStorage.setItem('yame-dim', dim); } catch {} refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
 // 文字が入っているときだけ右に×を出し、押すと一気に消す（そのまま次の名前を打てる）
