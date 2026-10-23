@@ -1151,7 +1151,8 @@ function ingest(rows, fileName) {
     used++;
     let c = customers.get(code);
     if (!c) { c = { code, name:'', addr:'', addr2:'', lat:null, lng:null, rank:'', rfm:'', events:[], visits:[], appl:{}, keys:new Set() }; customers.set(code, c); }
-    const name = pick(row, ['顧客名称', '顧客名', '氏名']); if (name) c.name = String(name).trim();
+    if (!enrichOnly) c.listed = true;   // on ② お店誌 or a ⑥⑦ list (decides whether a ランクR customer is shown)
+    const name =pick(row, ['顧客名称', '顧客名', '氏名']); if (name) c.name = String(name).trim();
     // RFM files carry the address in 結合済み instead of 住所
     let addr = pick(row, ['住所']);
     if (!addr) { const j = String(pick(row, ['結合済み', '住所結合'])); if (/[都道府県市区町村]|\d+-\d+/.test(j)) addr = j; }
@@ -1226,9 +1227,13 @@ function ingest(rows, fileName) {
   return used;
 }
 
+// 顧客ランクR の人は基本は地図に出さない。ただし ②お店誌・⑥⑦の一覧に載っている、2026/9/1以降の接点（チラシ・推進・見込み・訪問）がある、
+// 地図アプリの行動記録がある、のどれかなら出す。外した人は rHidden に取っておき、記録が増えたら戻す（ランクは月1回見直し）
+const R_SINCE = new Date(2026, 8, 1);
+let rHidden = new Map();
+const rShown = c => c.listed || c.hasRec || c.catalogTarget || [...c.events, ...c.visits].some(e => e.date && e.date >= R_SINCE);
 function finalize() {
-  // 顧客ランクR の人は地図に出さない（所有データの絞り込みは別の「ランク」列なので、ここでも外す。⑥⑦だけに載っている人も）
-  for (const [code, c] of customers) if (c.rank === 'R') customers.delete(code);
+  for (const [code, c] of customers) if (c.rank === 'R' && !rShown(c)) { customers.delete(code); rHidden.set(code, c); }
   for (const c of customers.values()) {
     const all = [...c.events, ...c.visits].filter(e => e.staff);
     all.sort((a, b) => (b.date || 0) - (a.date || 0));
@@ -1318,7 +1323,7 @@ function idb(mode, fn) {
     };
   });
 }
-const saveData = () => idb('readwrite', s => s.put({ customers, sources, srcMods, savedAt: new Date() }, 'last')).catch(() => {});
+const saveData = () => idb('readwrite', s => s.put({ customers: new Map([...customers, ...rHidden]), sources, srcMods, savedAt: new Date() }, 'last')).catch(() => {});
 const loadData = () => idb('readonly', s => s.get('last')).catch(() => null);
 const clearData = () => idb('readwrite', s => s.delete('last')).catch(() => {});
 let savedAt = null;
@@ -1376,7 +1381,8 @@ const odFile = async f => {
 
 async function importFiles(files) {
   if (!files.length) return;
-  if (isSample || freshNext) { customers = new Map(); sources = []; srcMods = {}; isSample = false; }
+  if (isSample || freshNext) { customers = new Map(); rHidden = new Map(); sources = []; srcMods = {}; isSample = false; }
+  else for (const [code, c] of rHidden) customers.set(code, c);   // adding files: put the hidden ランクR people back so their rows merge
   freshNext = false; srcNewer = false;
   let rows = 0; const bad = [];
   files = [...files].sort((a, b) => isMasterFile(a.name) - isMasterFile(b.name));   // the ownership file goes last
@@ -2264,7 +2270,10 @@ function computeRecords() {
 const CP_KINDS = ['Aチラシ', 'B推進', 'C見込み'];
 // put the records onto the customers (undoing what an earlier pass added first)
 function applyRecords() {
+  for (const [code, c] of rHidden) customers.set(code, c);   // ランクRで外していた人も、記録を当て直してから決め直す
+  rHidden.clear();
   for (const c of customers.values()) {
+    c.hasRec = false;
     c.visits = c.visits.filter(v => !v.fromRec);
     c.events = c.events.filter(v => !v.fromRec);
     for (const k in c.appl) {
@@ -2276,6 +2285,7 @@ function applyRecords() {
   const { recs } = computeRecords();
   for (const r of [...recs.values()].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const c = customers.get(r.code); if (!c) continue;
+    c.hasRec = true;
     const d = r.date ? new Date(r.date + 'T00:00:00') : null;
     if (r.kind === '訪問') c.visits.push({ date: d, staff: r.staff, kind: '訪問', custom: '', fromRec: true });
     else if (CP_KINDS.includes(r.kind)) c.events.push({ date: d, staff: r.staff, kind: r.kind, custom: '', fromRec: true });   // 1チラシ・2推進・3見込み
