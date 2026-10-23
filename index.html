@@ -676,6 +676,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .btn{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--surface-2)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.primary.newdata{background:#e67e22;border-color:#e67e22;color:#fff}
+#openPanel.newdata{position:relative}
+#openPanel.newdata::after{content:"";position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#e67e22;border:2px solid var(--surface)}
 #openPanel{display:none}
 
 /* side panel */
@@ -1302,14 +1305,34 @@ function renderSrcMods() {
   const behind = names.filter(n => last - srcMods[n] > SRC_GAP);
   const old = behind.length === 1 ? `${esc(srcTag(behind[0]))}だけ ${fmtMod(srcMods[behind[0]])}`
     : behind.map(n => `${esc(srcTag(n))} ${fmtMod(srcMods[n])}`).join('・');
-  box.innerHTML = (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) +
-    (srcNewer ? '<span class="new">新しいデータあり</span>' : '');
+  box.innerHTML = behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`;
+}
+// OneDrive has something newer than this device shows: orange button that asks to load it, and a dot on メニュー
+const OD_LABEL = { odBtn: 'OneDriveから最新を読み込む', viewBtn: '最新のお客様データを表示' };
+function showNewer() {
+  for (const id in OD_LABEL) {
+    const b = $('#' + id); if (b.disabled) continue;
+    b.classList.toggle('newdata', srcNewer);
+    b.textContent = srcNewer ? '新しいデータがあります ― 押して読み込む' : OD_LABEL[id];
+  }
+  $('#openPanel').classList.toggle('newdata', srcNewer);
 }
 // a listing of the OneDrive folder: is any loaded file newer there than what this device shows?
+// data saved before the file times were kept is compared with when it was loaded
 function checkNewer(list) {
-  srcNewer = list.some(f => srcMods[f.name] && Date.parse(f.lastModifiedDateTime) > srcMods[f.name] + 1000);
-  renderSrcMods();
+  const loaded = new Set(sources.map(s => s.replace(/（[\d,]+行）$/, '')));
+  const base = n => srcMods[n] || (!Object.keys(srcMods).length && savedAt ? +new Date(savedAt) : 0);
+  srcNewer = !isSample && list.some(f => loaded.has(f.name) && base(f.name) && Date.parse(f.lastModifiedDateTime) > base(f.name) + 1000);
+  renderSrcMods(); showNewer();
 }
+let newerAt = 0;
+async function checkNewerNow() {
+  if (backFromLogin || !odReady() || !sources.length || isSample || !navigator.onLine) return;
+  if (Date.now() - newerAt < 600000) return;   // at most once every 10 minutes
+  newerAt = Date.now();
+  try { const t = await odToken(); if (t) checkNewer(await odFolderChildren(t)); } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkNewerNow(); });
 const odFile = async f => {
   const r = await fetch(f['@microsoft.graph.downloadUrl']);
   if (!r.ok) throw new Error(`${f.name} をダウンロードできませんでした`);
@@ -1329,7 +1352,7 @@ async function importFiles(files) {
       if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); srcMods[f.name] = f.lastModified; }
     } catch (e) { bad.push(`${f.name}：${e.message}`); }
   }
-  applyRecords(); savedAt = new Date(); rebuild(true); renderSrcMods();
+  applyRecords(); savedAt = new Date(); rebuild(true); renderSrcMods(); showNewer();
   saveData();
   recLoad();
   const noXY = [...customers.values()].filter(c => c.lat == null).length;
@@ -2024,7 +2047,7 @@ async function odViewerLoad(auto) {
     await importFiles(got);
   } catch (e) {
     toast(e.message, 8000);
-  } finally { btn.disabled = false; btn.textContent = '最新のお客様データを表示'; }
+  } finally { btn.disabled = false; btn.textContent = OD_LABEL.viewBtn; showNewer(); }
 }
 $('#viewBtn').addEventListener('click', () => odViewerLoad(false));
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
@@ -2717,8 +2740,7 @@ loadData().then(d => {
   }
   if (viewerMode() && !backFromLogin) odViewerLoad(true);   // refresh to the latest when already signed in
   // owner: only look at the file dates on OneDrive (no download) and say when there is something newer
-  else if (!viewerMode() && !backFromLogin && odReady() && Object.keys(srcMods).length && navigator.onLine)
-    setTimeout(async () => { try { const t = await odToken(); if (t) checkNewer(await odFolderChildren(t)); } catch {} }, 3000);
+  else setTimeout(checkNewerNow, 3000);
 });
 })();
 </script>
