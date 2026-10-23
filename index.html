@@ -621,6 +621,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #brand .mark{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);display:inline-block}
 #searchWrap{flex:1 1 180px;min-width:0;position:relative}
 #search{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 12px;font-size:16px}
+#search{padding-right:40px}#search::-webkit-search-cancel-button{display:none}   /* 右の×（自前）で一気に消す */
+#searchClear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:none;border-radius:50%;background:#9aa5ab;color:#fff;font-size:20px;font-weight:700;line-height:32px;padding:0;cursor:pointer}
+#searchClear[hidden]{display:none}
 #hits{position:absolute;left:0;right:0;top:44px;z-index:1600;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-height:60vh;overflow-y:auto;padding:4px 10px 8px}
 #hits[hidden]{display:none}
 #list:empty{border-top:none}
@@ -833,7 +836,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <button class="btn" id="panelToggle" type="button" aria-controls="panel">◀ 情報を隠す</button>
     <div id="brand"><span class="mark" aria-hidden="true"></span><span class="txt">八女 顧客マップ</span></div>
     <div id="searchWrap">
-      <input id="search" type="search" placeholder="名前・電話番号の下4桁・顧客番号で探す" aria-label="顧客を探す" autocomplete="off">
+      <input id="search" type="search" placeholder="名前・電話番号の下4桁・顧客番号で探す" aria-label="顧客を探す" autocomplete="off"><button type="button" id="searchClear" aria-label="入力を消す" hidden>×</button>
       <div id="hits" hidden><ul id="list"></ul><div class="more" id="listMore"></div></div>
     </div>
     <div class="colorby"><label for="dim">ピンの色分け</label>
@@ -1875,6 +1878,11 @@ document.addEventListener('click', e => {
 $('#search').addEventListener('focus', renderList);
 $('#dim').addEventListener('change', e => { dim = e.target.value; try { localStorage.setItem('yame-dim', dim); } catch {} refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
+// 文字が入っているときだけ右に×を出し、押すと一気に消す（そのまま次の名前を打てる）
+const syncClear = () => { $('#searchClear').hidden = !$('#search').value; };
+$('#search').addEventListener('input', syncClear); $('#search').addEventListener('focus', syncClear); setInterval(syncClear, 1000);
+$('#searchClear').addEventListener('pointerdown', e => e.preventDefault());   // 押してもキーボードを閉じない
+$('#searchClear').addEventListener('click', () => { const s = $('#search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); s.focus(); syncClear(); });
 // the home-screen app has no browser reload button: reload the page, skipping the cached copy
 $('#reloadApp').addEventListener('click', () => { location.replace(location.pathname + '?v=' + Date.now()); });
 // 黄色の帯の基準日 (empty = every recorded check counts)
