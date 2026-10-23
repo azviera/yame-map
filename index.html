@@ -686,6 +686,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #panelHead{display:none}
 .count{font-size:13px;color:var(--muted)}
 .count b{font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums}
+.srcmods{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;font-variant-numeric:tabular-nums}
+.srcmods .nw{white-space:nowrap}
+.srcmods .new{white-space:nowrap;color:var(--accent);font-weight:700;margin-left:6px}
 .datafile{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 .datafile .row{display:flex;gap:8px;flex-wrap:wrap}
 .sample-tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;background:#f6e7b8;color:#5c4500;font-weight:700}
@@ -848,6 +851,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div id="panelHead"><b>検索・絞り込み</b><button class="btn" id="closePanel" type="button">閉じる</button></div>
     <div class="sec">
       <div class="count">地図に表示中 <b id="shown">0</b> / <span id="total">0</span> 件</div>
+      <div id="srcMods" class="srcmods" hidden></div>
     </div>
     <div class="sec datafile">
       <h2>データ <a id="reloadApp">アプリを最新にする ↻</a></h2>
@@ -1276,26 +1280,49 @@ function idb(mode, fn) {
     };
   });
 }
-const saveData = () => idb('readwrite', s => s.put({ customers, sources, savedAt: new Date() }, 'last')).catch(() => {});
+const saveData = () => idb('readwrite', s => s.put({ customers, sources, srcMods, savedAt: new Date() }, 'last')).catch(() => {});
 const loadData = () => idb('readonly', s => s.get('last')).catch(() => null);
 const clearData = () => idb('readwrite', s => s.delete('last')).catch(() => {});
 let savedAt = null;
 let freshNext = true;   // the first import after opening replaces the remembered data instead of adding to it
+// when each loaded file was last changed on OneDrive (file name -> ms), kept with the data so it shows offline too
+let srcMods = {}, srcNewer = false;
+const srcTag = n => (n.match(/^[①-⑳]/) || [])[0] || (/所有/.test(n) ? '所有' : n.replace(/\.\w+$/, '').slice(0, 6));
+const srcRank = n => /^[①-⑳]/.test(n) ? n.charCodeAt(0) : 1e6;
+const fmtTime = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+function renderSrcMods() {
+  const names = isSample ? [] : Object.keys(srcMods).filter(n => srcMods[n]).sort((a, b) => srcRank(a) - srcRank(b) || a.localeCompare(b, 'ja'));
+  const box = $('#srcMods');
+  box.hidden = !names.length;
+  box.innerHTML = names.length ? '元データ更新：' + names.map(n => { const d = new Date(srcMods[n]);
+    return `<span class="nw">${esc(srcTag(n))} ${d.getMonth() + 1}/${d.getDate()} ${fmtTime(d)}</span>`; }).join('・') +
+    (srcNewer ? '<span class="new">新しいデータあり</span>' : '') : '';
+}
+// a listing of the OneDrive folder: is any loaded file newer there than what this device shows?
+function checkNewer(list) {
+  srcNewer = list.some(f => srcMods[f.name] && Date.parse(f.lastModifiedDateTime) > srcMods[f.name] + 1000);
+  renderSrcMods();
+}
+const odFile = async f => {
+  const r = await fetch(f['@microsoft.graph.downloadUrl']);
+  if (!r.ok) throw new Error(`${f.name} をダウンロードできませんでした`);
+  return new File([await r.blob()], f.name, { lastModified: Date.parse(f.lastModifiedDateTime) || Date.now() });
+};
 
 async function importFiles(files) {
   if (!files.length) return;
-  if (isSample || freshNext) { customers = new Map(); sources = []; isSample = false; }
-  freshNext = false;
+  if (isSample || freshNext) { customers = new Map(); sources = []; srcMods = {}; isSample = false; }
+  freshNext = false; srcNewer = false;
   let rows = 0; const bad = [];
   files = [...files].sort((a, b) => isMasterFile(a.name) - isMasterFile(b.name));   // the ownership file goes last
   for (const f of files) {
     try {
       const objs = await readFile(f);
       const n = ingest(objs, f.name);
-      if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); }
+      if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); srcMods[f.name] = f.lastModified; }
     } catch (e) { bad.push(`${f.name}：${e.message}`); }
   }
-  applyRecords(); savedAt = new Date(); rebuild(true);
+  applyRecords(); savedAt = new Date(); rebuild(true); renderSrcMods();
   saveData();
   recLoad();
   const noXY = [...customers.values()].filter(c => c.lat == null).length;
@@ -1938,11 +1965,7 @@ const DEFAULT_SKIP = /^【(?!毎日)|4月1日から/;   // 【毎日③】所有
 const isDataFile = i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name);
 async function odDownload(list) {
   const got = [];
-  for (const f of list) {
-    const r = await fetch(f['@microsoft.graph.downloadUrl']);
-    if (!r.ok) throw new Error(`${f.name} をダウンロードできませんでした`);
-    got.push(new File([await r.blob()], f.name));
-  }
+  for (const f of list) got.push(await odFile(f));
   return got;
 }
 async function odWhoAmI(token) {
@@ -2517,12 +2540,13 @@ async function odShowList() {
     const r = await odRetry401(token => odFolderChildren(token));
     if (r.needLogin) { lsSet('yame-od-pending', true); await odLogin(); return; }
     await odReadSettings(r.value);
+    checkNewer(r.value);
     const files = r.value.filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
       .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
     const skip = new Set(lsGet('yame-od-skip') || files.filter(f => DEFAULT_SKIP.test(f.name)).map(f => f.name));
     box.innerHTML = '<b>読み込むファイル</b>' + files.map((f, i) =>
-      `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} 更新</span></span></label>`).join('') +
+      `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} ${fmtTime(new Date(f.lastModifiedDateTime))} 更新</span></span></label>`).join('') +
       '<div class="row"><button class="btn primary" id="odGo" type="button">この内容で読み込む</button><button class="btn" id="odClose" type="button">閉じる</button></div>';
     $('#odClose').onclick = () => { box.hidden = true; };
     $('#odGo').onclick = async () => {
@@ -2532,12 +2556,7 @@ async function odShowList() {
       if (!pick.length) { toast('ファイルを1つ以上選んでください', 3000); return; }
       box.textContent = `${pick.length}ファイルをダウンロードしています…`;
       try {
-        const got = [];
-        for (const f of pick) {
-          const r = await fetch(f['@microsoft.graph.downloadUrl']);
-          if (!r.ok) throw new Error(`${f.name} をダウンロードできませんでした`);
-          got.push(new File([await r.blob()], f.name));
-        }
+        const got = await odDownload(pick);
         box.hidden = true;
         freshNext = true;
         await importFiles(got);
@@ -2685,11 +2704,14 @@ if (viewerMode()) { customers = new Map(); sources = []; isSample = false; }   /
 rebuild(true);
 loadData().then(d => {
   if (d && d.customers instanceof Map && d.customers.size && (isSample || !customers.size)) {
-    customers = d.customers; sources = d.sources || []; savedAt = d.savedAt || null; isSample = false;
-    applyRecords(); rebuild(true); recLoad();
+    customers = d.customers; sources = d.sources || []; srcMods = d.srcMods || {}; savedAt = d.savedAt || null; isSample = false;
+    applyRecords(); rebuild(true); recLoad(); renderSrcMods();
     toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
   }
   if (viewerMode() && !backFromLogin) odViewerLoad(true);   // refresh to the latest when already signed in
+  // owner: only look at the file dates on OneDrive (no download) and say when there is something newer
+  else if (!viewerMode() && !backFromLogin && odReady() && Object.keys(srcMods).length && navigator.onLine)
+    setTimeout(async () => { try { const t = await odToken(); if (t) checkNewer(await odFolderChildren(t)); } catch {} }, 3000);
 });
 })();
 </script>
