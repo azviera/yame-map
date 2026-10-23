@@ -1725,8 +1725,10 @@ document.addEventListener('change', e => {
   try { localStorage.setItem('yame-logos2', JSON.stringify(show)); } catch {}
   renderLabels();
 });
-// icons shrink as the map zooms out (and stay a little under full size when zoomed in)
-const iconScale = () => { const z = map.getZoom(); return z >= LABEL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (LABEL_ZOOM - z) * 0.08); };
+// icons shrink as the map zooms out. From LABEL_ZOOM they grow by a quarter over two zoom levels:
+// bigger where houses are far apart on screen, the same size as before where icons first appear (so no extra overlap)
+const dotScale = () => { const z = map.getZoom(); return z >= LABEL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (LABEL_ZOOM - z) * 0.08); };
+const iconScale = () => { const z = map.getZoom(); return z <= LABEL_ZOOM ? dotScale() : 0.65 * (1 + 0.125 * Math.min(2, z - LABEL_ZOOM)); };
 const applyIconScale = () => $('#map').style.setProperty('--s', iconScale());
 applyIconScale();
 map.on('zoomend', () => { applyIconScale(); refresh(); });
@@ -1746,7 +1748,7 @@ function passes(c, except) {
 function styleFor(c) {
   const sel = selected === c.code;
   // every dot of a colour looks the same (S rank is shown by its own icon, not a different ring)
-  const k = Math.max(0.45, iconScale());
+  const k = Math.max(0.45, dotScale());
   return { radius: (sel ? 11 : 7) * k, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
     color: sel ? css('--ink') : css('--pin-stroke'), weight: sel ? 3 : 1.5, renderer };
 }
