@@ -1227,6 +1227,8 @@ function ingest(rows, fileName) {
 }
 
 function finalize() {
+  // 顧客ランクR の人は地図に出さない（所有データの絞り込みは別の「ランク」列なので、ここでも外す。⑥⑦だけに載っている人も）
+  for (const [code, c] of customers) if (c.rank === 'R') customers.delete(code);
   for (const c of customers.values()) {
     const all = [...c.events, ...c.visits].filter(e => e.staff);
     all.sort((a, b) => (b.date || 0) - (a.date || 0));
