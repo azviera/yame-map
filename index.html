@@ -686,9 +686,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #panelHead{display:none}
 .count{font-size:13px;color:var(--muted)}
 .count b{font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums}
-.srcmods{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;font-variant-numeric:tabular-nums}
-.srcmods .nw{white-space:nowrap}
+.srcmods{font-size:12px;color:var(--muted);line-height:1.5;font-variant-numeric:tabular-nums}
 .srcmods .new{white-space:nowrap;color:var(--accent);font-weight:700;margin-left:6px}
+.srcmods .warn{color:#d97706;font-weight:700}
 .datafile{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 .datafile .row{display:flex;gap:8px;flex-wrap:wrap}
 .sample-tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;background:#f6e7b8;color:#5c4500;font-weight:700}
@@ -851,11 +851,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div id="panelHead"><b>検索・絞り込み</b><button class="btn" id="closePanel" type="button">閉じる</button></div>
     <div class="sec">
       <div class="count">地図に表示中 <b id="shown">0</b> / <span id="total">0</span> 件</div>
-      <div id="srcMods" class="srcmods" hidden></div>
     </div>
     <div class="sec datafile">
       <h2>データ <a id="reloadApp">アプリを最新にする ↻</a></h2>
       <div id="dataState"></div>
+      <div id="srcMods" class="srcmods" hidden></div>
       <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
       <div id="odBox" hidden></div>
       <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
@@ -1290,13 +1290,20 @@ let srcMods = {}, srcNewer = false;
 const srcTag = n => (n.match(/^[①-⑳]/) || [])[0] || (/所有/.test(n) ? '所有' : n.replace(/\.\w+$/, '').slice(0, 6));
 const srcRank = n => /^[①-⑳]/.test(n) ? n.charCodeAt(0) : 1e6;
 const fmtTime = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+// the files are normally updated together, so show one time (the newest); a file left far behind gets its own warning
+const SRC_GAP = 2 * 3600000;
+const fmtMod = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${fmtTime(d)}`; };
 function renderSrcMods() {
   const names = isSample ? [] : Object.keys(srcMods).filter(n => srcMods[n]).sort((a, b) => srcRank(a) - srcRank(b) || a.localeCompare(b, 'ja'));
   const box = $('#srcMods');
   box.hidden = !names.length;
-  box.innerHTML = names.length ? '元データ更新：' + names.map(n => { const d = new Date(srcMods[n]);
-    return `<span class="nw">${esc(srcTag(n))} ${d.getMonth() + 1}/${d.getDate()} ${fmtTime(d)}</span>`; }).join('・') +
-    (srcNewer ? '<span class="new">新しいデータあり</span>' : '') : '';
+  if (!names.length) { box.innerHTML = ''; return; }
+  const last = Math.max(...names.map(n => srcMods[n]));
+  const behind = names.filter(n => last - srcMods[n] > SRC_GAP);
+  const old = behind.length === 1 ? `${esc(srcTag(behind[0]))}だけ ${fmtMod(srcMods[behind[0]])}`
+    : behind.map(n => `${esc(srcTag(n))} ${fmtMod(srcMods[n])}`).join('・');
+  box.innerHTML = (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) +
+    (srcNewer ? '<span class="new">新しいデータあり</span>' : '');
 }
 // a listing of the OneDrive folder: is any loaded file newer there than what this device shows?
 function checkNewer(list) {
