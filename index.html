@@ -730,18 +730,18 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .lab::before{content:"";position:absolute;left:calc(-18px / var(--s,1));top:calc(-18px / var(--s,1));width:calc(36px / var(--s,1));height:calc(36px / var(--s,1));border-radius:50%}
 .lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}.lb-star{position:absolute;left:-8px;top:-8px;width:16px;height:16px;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
-.lb-left{position:absolute;right:12px;top:-40px;display:grid;grid-template-rows:16px 16px 16px 16px;justify-items:start}
+.lb-left{position:absolute;right:12px;top:-43px;display:grid;grid-template-rows:16px 16px 16px 16px;row-gap:2px;justify-items:start}   /* 段の間をあけて、隣の印どうしが重ならないように */
 /* only the visible marks take taps: the empty space of the icon block used to cover the neighbour's name */
 .lb-left,.lb-left .r{pointer-events:none}.lb-left i,.lb-left svg{pointer-events:auto}
-.lb-left .r{display:flex;gap:2px;height:16px;align-items:center}
+.lb-left .r{display:flex;gap:3px;height:16px;align-items:center}
 .lb-b{font-style:normal;font-weight:900;font-size:12px;line-height:14px;height:16px;min-width:16px;padding:0 2px;text-align:center;color:#fff;border-radius:1px;border:1px solid #000;white-space:nowrap}
 .lb-g{font-style:normal;font-weight:900;font-size:15px;line-height:16px;min-width:13px;text-align:center;font-family:"Arial Black","Hiragino Sans","BIZ UDPGothic",sans-serif;paint-order:stroke fill}
 .lb-g.k{-webkit-text-stroke:3px #000}
 .lb-g.w{-webkit-text-stroke:3px #fff}
 .lb-g.dg{font-size:14px}
-.lb-b.ta{position:relative}.lb-b.ta::after{content:"";position:absolute;right:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #000}
+.lb-b.ta{position:relative}.lb-b.ta::after{content:"";position:absolute;right:-2px;top:-2px;width:6px;height:6px;border-radius:50%;background:#fff;border:1.5px solid #000}   /* 印はアイコンの角の中に収める */
 .lb-b.maru{position:relative}   /* 所有を確認: 右下に黄色い丸と✓（右上の白い丸＝他店と区別） */
-.lb-b.maru::before{content:"✓";position:absolute;right:-6px;bottom:-6px;width:10px;height:10px;border-radius:50%;background:#ffd400;border:1.5px solid #000;color:#000;font-size:8px;line-height:10px;font-weight:900;text-align:center;box-sizing:content-box}
+.lb-b.maru::before{content:"✓";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;background:#ffd400;border:1.5px solid #000;color:#000;font-size:7px;line-height:8px;font-weight:900;text-align:center;box-sizing:content-box}
 .lb-sora{background:#5fe3f0;color:#000;border-color:#000}
 .lb-none{background:#eceff1;color:#9aa5ab;border-color:#b0bec5;font-weight:700}   /* 所有をまだ確認していない家電 */
 .lb-dash{display:inline-block;width:16px;height:6px;border-radius:3px;background:#111;border:1px solid #fff}
