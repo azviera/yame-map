@@ -2649,6 +2649,7 @@ try { panelOpen = localStorage.getItem('yame-panel') !== '0'; } catch {}
 setPanel(panelOpen);
 $('#panelToggle').addEventListener('click', () => { panelOpen = !panelOpen; setPanel(panelOpen); });
 // 現在地: centre once on press, then keep the blue dot following the phone
+const ME_ZOOM = 17;   // 現在地: close enough to see houses and customer icons (icons start at LABEL_ZOOM); a closer zoom is kept
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
 function showMe(p) {
   const ll = [p.coords.latitude, p.coords.longitude], acc = p.coords.accuracy || 0;
@@ -2656,7 +2657,7 @@ function showMe(p) {
     meRing = L.circle(ll, { radius: acc, color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
     meDot = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1, interactive: false }).addTo(map);
   } else meRing.setRadius(acc);
-  if (meCentre) { meCentre = false; meAnim = null; meDot.setLatLng(ll); meRing.setLatLng(ll); meFollowMove(() => map.setView(ll, Math.max(map.getZoom(), 16))); return; }
+  if (meCentre) { meCentre = false; meAnim = null; meDot.setLatLng(ll); meRing.setLatLng(ll); meFollowMove(() => map.setView(ll, Math.max(map.getZoom(), ME_ZOOM))); return; }
   meGlide(L.latLng(ll), acc <= 50);
 }
 // 位置は1秒ごとくらいに届くので、前の位置から次の位置まで、その間をなめらかに動かす（点も地図も）。
@@ -2708,7 +2709,7 @@ function meError(e) {
 $('#meBtn').addEventListener('click', () => {
   if (!navigator.geolocation) { toast('この画面では現在地を使えません。', 4000); return; }
   meCentre = true; setFollow(true);
-  if (meDot) { meCentre = false; meFollowMove(() => map.setView(meDot.getLatLng(), Math.max(map.getZoom(), 16))); }
+  if (meDot) { meCentre = false; meFollowMove(() => map.setView(meDot.getLatLng(), Math.max(map.getZoom(), ME_ZOOM))); }
   if (meWatch == null || meWatch === 'paused') meWatch = navigator.geolocation.watchPosition(showMe, meError, ME_OPTS);
 });
 // 縦横を回したとき: iPhoneが画面を少しずらしたままにすることがあるので元に戻し、地図の大きさを測り直す
