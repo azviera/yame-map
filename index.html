@@ -2649,7 +2649,7 @@ try { panelOpen = localStorage.getItem('yame-panel') !== '0'; } catch {}
 setPanel(panelOpen);
 $('#panelToggle').addEventListener('click', () => { panelOpen = !panelOpen; setPanel(panelOpen); });
 // 現在地: centre once on press, then keep the blue dot following the phone
-const ME_ZOOM = 17;   // 現在地: close enough to see houses and customer icons (icons start at LABEL_ZOOM); a closer zoom is kept
+const ME_ZOOM = 19;   // 現在地: a few houses fill the screen; a closer zoom is kept (satellite stops at its own limit)
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
 function showMe(p) {
   const ll = [p.coords.latitude, p.coords.longitude], acc = p.coords.accuracy || 0;
