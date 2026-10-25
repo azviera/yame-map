@@ -680,8 +680,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .datepick.ro{border-style:dashed;cursor:default}
 .datepick.ro span[aria-hidden]{display:none}
 .datepick.ro input{display:none}
-.colorby{display:flex;align-items:center;gap:6px}
-.colorby label{font-size:12px;color:var(--muted);white-space:nowrap}
 #dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
 .btn{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--surface-2)}
@@ -734,6 +732,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);scrollbar-width:none;width:fit-content;max-width:calc(100% - 24px)}
 #legend::-webkit-scrollbar{display:none}
 #legend .lt{font-size:12px;font-weight:700;color:var(--muted);align-self:center;white-space:nowrap;padding:0 4px}
+/* 軒数バーの項目名: 押すとほかの項目の軒数に切り替え（地図の印は変わらない） */
+#legend select.lt{flex:none;height:30px;border:1px solid var(--line);border-radius:15px;background:var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23666' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 8px center;
+  padding:0 22px 0 10px;-webkit-appearance:none;appearance:none;color:var(--ink);font-size:16px;transform:scale(.8);transform-origin:left center;margin-right:-16px;cursor:pointer}
 .mapbtns{position:absolute;top:12px;left:12px;z-index:800;display:flex;flex-direction:column;gap:6px}
 .mapbtns .btn{box-shadow:var(--shadow);font-size:13px;height:34px}
 .mapbtns .mebtn{width:44px;height:44px;padding:0;display:grid;place-items:center;background:#fff;border-color:#dadce0;border-radius:8px}
@@ -841,11 +842,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #hits{right:auto;width:calc(100vw - 20px)}
   #search:placeholder-shown{padding-right:8px;padding-left:10px}   /* 空のときは×が出ないので、案内の文字を広く */
   #openPanel{order:1;padding-inline:10px;flex:none}
-  .colorby{order:2;flex:none}
-  /* 小さい自前の矢印にして「最近接点者」が切れずに入るように */
-  #dim{width:92px;font-size:12px;padding:0 15px 0 5px;text-overflow:ellipsis;-webkit-appearance:none;appearance:none;
-    background:var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23333' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 5px center}
-  .colorby label{display:none}
   #openPanel{display:inline-block}
   #loadTop{display:none}
   #panel{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:82%;border-right:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
@@ -870,7 +866,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   #searchWrap{order:0;flex:1 1 160px}
   #search{height:34px}
   #brand .txt{display:none}
-  #dim{max-width:28vw}
 }
 </style>
 
@@ -882,8 +877,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <input id="search" type="search" placeholder="名前・電話番号の下4桁・顧客番号で探す" aria-label="顧客を探す" autocomplete="off"><button type="button" id="searchClear" aria-label="入力を消す" hidden>×</button>
       <div id="hits" hidden><ul id="list"></ul><div class="more" id="listMore"></div></div>
     </div>
-    <div class="colorby"><label for="dim">ピンの色分け</label>
-      <select id="dim"></select></div>
     <button class="btn" id="openPanel" type="button">メニュー</button>
   </header>
 
@@ -909,9 +902,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
-      <div class="widesel"><span>広域で出すアイコン（引いた地図）</span>
+      <div class="widesel"><label for="dim">ピンの丸の色分け</label><select id="dim"></select></div>
+      <div class="widesel"><span>広域で出すアイコン（引いた地図・1〜11段階）</span>
         <button type="button" class="iconpick" id="widePick"></button></div>
-      <div class="widesel"><span>近くで出すアイコン（拡大した地図）</span>
+      <div class="widesel"><span>中域で出すアイコン（12〜15段階）</span>
+        <button type="button" class="iconpick" id="midPick"></button></div>
+      <div class="widesel"><span>詳細で出すアイコン（いちばん拡大・16〜18段階）</span>
         <button type="button" class="iconpick" id="nearPick"></button></div>
       <div class="widesel"><label for="checkSince">黄色い✓：この日以降に確認したもの</label>
         <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色い✓の基準日"></div></div>
@@ -927,7 +923,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div id="map" class="gridbg"></div>
     <div class="mapbtns">
       <select class="btn" id="baseSel" aria-label="地図の種類"></select>
-      <button class="btn mebtn" id="meBtn" type="button" aria-label="現在地" title="現在地"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#cfe3fb"/><circle cx="12" cy="12" r="5" fill="#1a73e8"/></svg></button>
+      <button class="btn mebtn" id="meBtn" type="button" aria-label="現在地" title="現在地"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#cfe3fb"/><circle id="meZoneDot" cx="12" cy="12" r="5" fill="#1a73e8"/></svg></button>
     </div>
     <div id="legend" aria-label="凡例（タップで表示・非表示）"></div>
     <section id="card" hidden aria-live="polite"></section>
@@ -1683,9 +1679,10 @@ let hidden = {}; for (const k in DIMS) hidden[k] = new Set();
 let query = '';
 let selected = null;
 
-// 全部のアイコンはズーム19から。18以下（1画素が約0.5m以上。市街地で家どうしが30〜40画素しか離れず、アイコンが重なる）は「広域」。
-// 重なるかどうかは画面の幅でなく1画素あたりの距離で決まるので、スマホもPCも同じ番号
-const LABEL_ZOOM = 19;
+// 拡大の段階: iPhoneで数えて1〜18（いちばん引いた所が1）＝ズーム5〜22なので、段階n＝ズームn+4。
+// 1〜11段階（ズーム15以下）＝広域、12〜15段階（16〜19）＝中域、16〜18段階（20〜22）＝詳細。区分ごとに出すアイコンを選べる
+const STAGE0 = 4, MID_ZOOM = 16, NEAR_ZOOM = 20;
+const zoneOf = (z = map.getZoom()) => z >= NEAR_ZOOM ? 'near' : z >= MID_ZOOM ? 'mid' : 'wide';
 const DOT_FULL_ZOOM = 15;   // 色の点・広域のアイコンが一番大きくなるズーム
 const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
@@ -1756,17 +1753,21 @@ try {
     else if (LOGO_KEYS.includes(w)) wideSet = new Set([w]);
   }
 } catch {}
-const labelMode = () => map.getZoom() >= LABEL_ZOOM;
-const iconMode = () => labelMode() || wideSet.size > 0;
+// 中域: 最初は今までの「近く（詳細）」と同じ選び方
+let midSet;
+try { const m2 = JSON.parse(localStorage.getItem('yame-mid') || 'null'); if (Array.isArray(m2)) midSet = new Set(m2.filter(k => LOGO_KEYS.includes(k))); } catch {}
+midSet ||= new Set(LOGO_KEYS.filter(k => show[k]));
+const zoneSet = zone => zone === 'wide' ? wideSet : zone === 'mid' ? midSet : new Set(LOGO_KEYS.filter(k => show[k]));
+const iconMode = () => zoneSet(zoneOf()).size > 0;
 let renderedArea = null, renderedZoom = null;
 function renderLabels() {
   labelLayer.clearLayers();
   renderedArea = null;
   if (!iconMode()) return;
-  const full = labelMode();
+  const zone = zoneOf(), full = zone !== 'wide';
   const b = map.getBounds().pad(full ? 0.25 : 0.1);
   renderedArea = b; renderedZoom = map.getZoom();
-  const flags = full ? show : Object.fromEntries(LOGO_KEYS.map(k => [k, wideSet.has(k)]));
+  const set = zoneSet(zone), flags = Object.fromEntries(LOGO_KEYS.map(k => [k, set.has(k)]));
   let n = 0;
   for (const c of customers.values()) {
     if (c.lat == null || !passes(c) || !b.contains([c.lat, c.lng])) continue;
@@ -1792,17 +1793,19 @@ function chipIcon(k) {
     catalog: glyph('お', staffColor('ト'), 'w'), contact: [1, 2, 3].map(n => glyph(n, staffColor('ト'), 'w dg')).join(''),
     visit: glyph('訪', staffColor('タ'), 'w'), name: '<i class="lb-b" style="background:#333;color:#fff">名</i>' }[k] || '';
 }
-const pickSet = which => which === 'wide' ? wideSet : new Set(LOGO_KEYS.filter(k => show[k]));
+const pickSet = zoneSet;
+const PICK_TITLE = { wide: '広域（1〜11段階）で出すアイコン', mid: '中域（12〜15段階）で出すアイコン', near: '詳細（16〜18段階）で出すアイコン' };
 function renderPicks() {
-  for (const which of ['wide', 'near']) {
+  for (const which of ['wide', 'mid', 'near']) {
     const s = pickSet(which);
     $(`#${which}Pick`).innerHTML = s.size
       ? LOGOS.filter(l => s.has(l.k)).map(l => `<span class="ichip" title="${esc(l.label)}">${chipIcon(l.k)}</span>`).join('')
-      : `<span class="ph">${which === 'wide' ? '色の点だけ（押して選ぶ）' : 'ピンだけ（押して選ぶ）'}</span>`;
+      : '<span class="ph">色の点だけ（押して選ぶ）</span>';
   }
 }
 function savePick(which, s) {
   if (which === 'wide') { wideSet = s; try { localStorage.setItem('yame-wide2', JSON.stringify([...s])); } catch {} }
+  else if (which === 'mid') { midSet = s; try { localStorage.setItem('yame-mid', JSON.stringify([...s])); } catch {} }
   else { for (const k of LOGO_KEYS) show[k] = s.has(k); try { localStorage.setItem('yame-logos2', JSON.stringify(show)); } catch {} }
   renderPicks(); refresh();
 }
@@ -1810,7 +1813,7 @@ let pickWhich = 'wide';
 function openPick(which) {
   pickWhich = which;
   const s = pickSet(which);
-  $('#psTitle').textContent = which === 'wide' ? '広域（引いた地図）で出すアイコン' : '近く（拡大した地図）で出すアイコン';
+  $('#psTitle').textContent = PICK_TITLE[which];
   $('#psList').innerHTML = LOGOS.map(l =>
     `<label><input type="checkbox" data-pk="${l.k}"${s.has(l.k) ? ' checked' : ''}><span class="ic">${chipIcon(l.k)}</span>${esc(l.label)}</label>`).join('');
   $('#pickSheet').hidden = false;
@@ -1823,6 +1826,7 @@ $('#psNone').addEventListener('click', () => pickAll(false));
 $('#psOk').addEventListener('click', () => { $('#pickSheet').hidden = true; });
 $('#pickSheet').addEventListener('click', e => { if (e.target.id === 'pickSheet') $('#pickSheet').hidden = true; });
 $('#widePick').addEventListener('click', () => openPick('wide'));
+$('#midPick').addEventListener('click', () => openPick('mid'));
 $('#nearPick').addEventListener('click', () => openPick('near'));
 function renderLogoToggles() {
   renderPicks();
@@ -1848,10 +1852,11 @@ function renderLogoToggles() {
     row([1, 2, 3].map(n => glyph(n, st('ト'), 'w dg')).join(''), '接点 1チラシ・2推進・3見込み（色は担当）') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
-// dots and 広域 icons shrink as the map zooms out; the full icons (from LABEL_ZOOM, where houses are far apart on screen) are a quarter bigger
+// dots and 広域 icons shrink as the map zooms out; 中域 icons are the usual size, 詳細 (houses far apart on screen) a quarter bigger
 const dotScale = () => { const z = map.getZoom(); return z >= DOT_FULL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (DOT_FULL_ZOOM - z) * 0.08); };
-const iconScale = () => map.getZoom() < LABEL_ZOOM ? dotScale() : 0.8125;
-const applyIconScale = () => $('#map').style.setProperty('--s', iconScale());
+const iconScale = () => ({ wide: dotScale(), mid: 0.65, near: 0.8125 })[zoneOf()];
+// 現在地ボタンの中の丸: 詳細＝大きい・中域＝中くらい・広域＝小さい（ピンチで変えたときも）
+const applyIconScale = () => { $('#map').style.setProperty('--s', iconScale()); $('#meZoneDot').setAttribute('r', { wide: 3, mid: 5, near: 7.5 }[zoneOf()]); };
 applyIconScale();
 map.on('zoomend', () => { applyIconScale(); refresh(); });
 // a tap on a phone often nudges the map a little; rebuilding the icons then would swallow the tap,
@@ -1925,9 +1930,21 @@ function chipHTML(k, v, n) {
   return `<button type="button" class="chip${off ? ' off' : ''}" data-k="${k}" data-v="${esc(v)}" aria-pressed="${!off}">
     <span class="dot${isRing(k, v) ? ' ring' : ''}" style="${dotStyle(k, v)}"></span>${esc(v)}<span class="n">${n}</span></button>`;
 }
+// 下の軒数バー: 数を見るためのもの。左の項目名を押すと、ほかの項目の軒数に切り替わる（地図の印は変わらない）。
+// 各ボタンを押すと、今までどおりその人たちを地図に出す・隠す（絞り込み）
+let legendDim = dim;
+try { const l = localStorage.getItem('yame-legend'); if (l && DIMS[l]) legendDim = l; } catch {}
 function renderLegend() {
-  $('#legend').innerHTML = `<span class="lt">${esc(DIMS[dim].label)}</span>` + valuesFor(dim).map(x => chipHTML(dim, x.v, x.n)).join('');
+  $('#legend').innerHTML = `<select class="lt" id="legendSel" aria-label="軒数を見る項目" title="押すと、ほかの項目の軒数に切り替わります">${
+    Object.keys(DIMS).map(k => `<option value="${k}"${k === legendDim ? ' selected' : ''}>${esc(DIMS[k].label)}</option>`).join('')}</select>` +
+    valuesFor(legendDim).map(x => chipHTML(legendDim, x.v, x.n)).join('');
 }
+document.addEventListener('change', e => {
+  if (e.target.id !== 'legendSel') return;
+  legendDim = e.target.value;
+  try { localStorage.setItem('yame-legend', legendDim); } catch {}
+  renderLegend();
+});
 function renderFilters() {
   $('#filters').innerHTML = Object.keys(DIMS).map(k =>
     `<div class="fgroup"><div class="t">${esc(DIMS[k].label)}</div><div class="chips">${valuesFor(k).map(x => chipHTML(k, x.v, x.n)).join('')}</div></div>`).join('');
@@ -2863,7 +2880,10 @@ try { panelOpen = localStorage.getItem('yame-panel') !== '0'; } catch {}
 setPanel(panelOpen);
 $('#panelToggle').addEventListener('click', () => { panelOpen = !panelOpen; setPanel(panelOpen); });
 // 現在地: centre once on press, then keep the blue dot following the phone
-const ME_ZOOM = 19;   // 現在地: a few houses fill the screen; a closer zoom is kept (satellite stops at its own limit)
+// 押すたびに 中域12段階 → 詳細16段階 → 広域10段階 → 中域12 … と大きさが変わる（航空写真は写真のある大きさまで）
+const ME_STAGE = { mid: 12, near: 16, wide: 10 };   // ← 詳細へ飛ぶ段階を15にするなら near: 15
+const ME_CYCLE = [ME_STAGE.mid, ME_STAGE.near, ME_STAGE.wide].map(s => s + STAGE0);
+let meCycle = 0, meZoom = ME_CYCLE[0];
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
 function showMe(p) {
   const ll = [p.coords.latitude, p.coords.longitude], acc = p.coords.accuracy || 0;
@@ -2871,7 +2891,7 @@ function showMe(p) {
     meRing = L.circle(ll, { radius: acc, color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
     meDot = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1, interactive: false }).addTo(map);
   } else meRing.setRadius(acc);
-  if (meCentre) { meCentre = false; meAnim = null; meDot.setLatLng(ll); meRing.setLatLng(ll); meFollowMove(() => map.setView(ll, Math.max(map.getZoom(), ME_ZOOM))); return; }
+  if (meCentre) { meCentre = false; meAnim = null; meDot.setLatLng(ll); meRing.setLatLng(ll); meFollowMove(() => map.setView(ll, meZoom)); return; }
   meGlide(L.latLng(ll), acc <= 50);
 }
 // 位置は1秒ごとくらいに届くので、前の位置から次の位置まで、その間をなめらかに動かす（点も地図も）。
@@ -2922,8 +2942,9 @@ function meError(e) {
 }
 $('#meBtn').addEventListener('click', () => {
   if (!navigator.geolocation) { toast('この画面では現在地を使えません。', 4000); return; }
+  meZoom = ME_CYCLE[meCycle++ % ME_CYCLE.length];
   meCentre = true; setFollow(true);
-  if (meDot) { meCentre = false; meFollowMove(() => map.setView(meDot.getLatLng(), Math.max(map.getZoom(), ME_ZOOM))); }
+  if (meDot) { meCentre = false; meFollowMove(() => map.setView(meDot.getLatLng(), meZoom)); }
   if (meWatch == null || meWatch === 'paused') meWatch = navigator.geolocation.watchPosition(showMe, meError, ME_OPTS);
 });
 // 縦横を回したとき: iPhoneが画面を少しずらしたままにすることがあるので元に戻し、地図の大きさを測り直す
