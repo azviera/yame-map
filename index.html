@@ -1392,8 +1392,10 @@ function renderSrcMods() {
   const mods = {};
   if (!isSample) {
     for (const n in srcMods) if (srcMods[n] && !isJsonData(n)) mods[n] = srcMods[n];
-    if (srcMods[JSON_DATA]) for (const k in jsonSrc) if (k !== '作成日時') mods[k] = jsonSrc[k];
+    // 基本azyamedata は座標だけの手入力の元で、CSVより古いのが普通なので、時刻の比較（⚠）からは外して別の行に出す
+    if (srcMods[JSON_DATA]) for (const k in jsonSrc) if (k !== '作成日時' && !/^基本/.test(k)) mods[k] = jsonSrc[k];
   }
+  const baseKey = srcMods[JSON_DATA] && Object.keys(jsonSrc).find(k => /^基本/.test(k));
   const tag = n => JSON_SRC_TAG[n] || srcTag(n);
   const names = Object.keys(mods).sort((a, b) => srcRank(a) - srcRank(b) || a.localeCompare(b, 'ja'));
   const box = $('#srcMods');
@@ -1403,7 +1405,8 @@ function renderSrcMods() {
   const behind = names.filter(n => last - mods[n] > SRC_GAP);
   const old = behind.length === 1 ? `${esc(tag(behind[0]))}だけ ${fmtMod(mods[behind[0]])}`
     : behind.map(n => `${esc(tag(n))} ${fmtMod(mods[n])}`).join('・');
-  const made = srcMods[JSON_DATA] && jsonSrc['作成日時'] ? `<br>地図用データ作成：${fmtMod(jsonSrc['作成日時'])}` : '';
+  const made = (baseKey ? `<br>座標：${fmtMod(jsonSrc[baseKey])}` : '') +
+    (srcMods[JSON_DATA] && jsonSrc['作成日時'] ? `<br>地図用データ作成：${fmtMod(jsonSrc['作成日時'])}` : '');
   // 予備（今までのExcel）で表示しているときだけ小さく知らせる
   const fallback = !srcMods[JSON_DATA] ? `<span class="warn">${JSON_DATA} が読めないので古いファイルで表示しています</span><br>` : '';
   box.innerHTML = fallback + (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) + made;
