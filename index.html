@@ -661,7 +661,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
-.acount{display:inline-block;margin-top:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:none;color:var(--accent,#1a73e8);cursor:pointer}
+.acount{display:inline-block;white-space:nowrap;margin-top:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:none;color:var(--accent,#1a73e8);cursor:pointer}
 /* 全N台の一覧は家電の行の下に、カードの幅いっぱいを使って出す */
 .aunits{grid-column:1/-1;margin-top:-2px;border-left:3px solid var(--line);padding-left:8px;color:var(--muted)}.aunits[hidden]{display:none}
 .aunit{font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line)}.aunit:last-child{border-bottom:0}
@@ -815,7 +815,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .links a{font-size:13px;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:6px 10px;text-decoration:none}
 .appl{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:baseline;font-size:14px}
-.appl .k{font-weight:700}
+.appl .k{font-weight:700;max-width:5.2em}   /* スティック掃除機など長い名前は2行にして、品番・日付の幅をあける */
+.appl .nw{white-space:nowrap}
 .appl .m{color:var(--muted);font-size:12px;min-width:0}
 .age{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;color:#fff;white-space:nowrap;justify-self:end}
 .hist{list-style:none;margin:0;padding:0;font-size:13px}
@@ -1959,9 +1960,10 @@ function select(code, pan) {
   // 他店 purchases are registered on 1 January of the year made (the shop never sells on 1/1)
   const whenOf = a => {
     const jan1 = a.date && a.date.getMonth() === 0 && a.date.getDate() === 1;
-    return !a.date ? '' : (a.store === '他店' ? '他店・' : '') + (jan1 ? `${a.date.getFullYear()}年製` : a.store === '他店' ? fmtDate(a.date) : `${fmtDate(a.date)} 納品`);
+    // 「2009/11/08 納品」「○ 2026/09/04 確認」は途中で折り返さない
+    return !a.date ? '' : `<span class="nw">${(a.store === '他店' ? '他店・' : '') + (jan1 ? `${a.date.getFullYear()}年製` : a.store === '他店' ? fmtDate(a.date) : `${fmtDate(a.date)} 納品`)}</span>`;
   };
-  const seenOf = a => checkedOn(a) ? `${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認` : a.maru ? '○ 所有を目視で確認' : '';
+  const seenOf = a => checkedOn(a) ? `<span class="nw">${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認</span>` : a.maru ? '○ 所有を目視で確認' : '';
   const chkBtn = (cat, a) => a.fromRec ? '' : `<button type="button" class="acheck" data-acheck="${esc(cat)}|${c.appl[cat].indexOf(a)}">確認・変更</button>`;
   const ORDER = ['炊飯器', 'レンジ', 'IH', '給湯器', 'テレビ', 'エアコン', '冷蔵庫', '洗濯機'];
   const applRows = ORDER.filter(k => ORDER.indexOf(k) < 3 || c.appl[k] || (c.cnt && c.cnt[k] && c.cnt[k].n))
@@ -1978,12 +1980,12 @@ function select(code, pan) {
     const more = n > 1 ? `<button type="button" class="acount" data-aunits="${esc(cat)}">${cntTxt} ▼</button>` : cn && cn.other ? '他店で購入' : '';
     const list = n > 1 ? `<div class="aunits" data-units="${esc(cat)}" hidden>${
       [...units].sort((x, y) => (y.date || 0) - (x.date || 0)).map((u, i) => `<div class="aunit"><div><b>${i + 1}</b> ${esc(u.model) || '（型式なし）'}</div>
-        <div class="au2"><span>${whenOf(u)}${u.place ? '・' + esc(u.place) : ''}${u.hold ? HOLD_TAG : ''}</span>${u.date ? ageTag(u) : ''}</div>${
+        <div class="au2"><span>${whenOf(u)}${u.place ? '<span class="nw">・' + esc(u.place) + '</span>' : ''}${u.hold ? HOLD_TAG : ''}</span>${u.date ? ageTag(u) : ''}</div>${
         seenOf(u) || chkBtn(cat, u) ? `<div class="au3">${seenOf(u)}${chkBtn(cat, u)}</div>` : ''}</div>`).join('')
       }${n > units.length ? `<div class="aunit">店クラウドVには${n}台あります（地図には${units.length}台分の詳細）。残りは店クラウドVで確認してください</div>` : ''}</div>` : '';
     if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし${more ? '<br>' + more : ''}</span><span></span>${list}`;
     const seen = seenOf(a) ? '<br>' + seenOf(a) : '';
-    const info = (a.date ? `${esc(a.model)}<br>${whenOf(a)}${a.place ? '・' + esc(a.place) : ''}` : a.hold ? esc(a.model) || '（型式なし）' : '納品記録なし')
+    const info = (a.date ? `${esc(a.model)}<br>${whenOf(a)}${a.place ? '<span class="nw">・' + esc(a.place) + '</span>' : ''}` : a.hold ? esc(a.model) || '（型式なし）' : '納品記録なし')
       + (a.hold || units.some(u => u.hold) ? HOLD_TAG : '');   // a held unit behind 全n台 ▼ is flagged on the main line too
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
