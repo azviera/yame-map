@@ -1138,7 +1138,7 @@ function catOf(prefix) {
 }
 
 // the all-customer ownership file (【毎日③】所有azyamedata): base list, coordinates, ranks and appliances
-const isMasterFile = name => /所有azyamedata/i.test(name);
+const isMasterFile = name => /所有azyamedata|^地図用データ\.json$/i.test(name);
 function ingest(rows, fileName) {
   const visitFile = /訪問/.test(fileName);
   const enrichOnly = isMasterFile(fileName);
@@ -1154,6 +1154,8 @@ function ingest(rows, fileName) {
     let c = customers.get(code);
     if (!c) { c = { code, name:'', addr:'', addr2:'', lat:null, lng:null, rank:'', rfm:'', events:[], visits:[], appl:{}, keys:new Set() }; customers.set(code, c); }
     if (!enrichOnly) c.listed = true;   // on ② お店誌 or a ⑥⑦ list (decides whether a ランクR customer is shown)
+    if (row._rOk) c.rOk = true;         // 地図用データ.json: ランクRだが接点ありで表示
+    if (row._act) applyActivity(c, row._act);
     const name =pick(row, ['顧客名称', '顧客名', '氏名']); if (name) c.name = String(name).trim();
     // RFM files carry the address in 結合済み instead of 住所
     let addr = pick(row, ['住所']);
@@ -1233,7 +1235,7 @@ function ingest(rows, fileName) {
 // 地図アプリの行動記録がある、のどれかなら出す。外した人は rHidden に取っておき、記録が増えたら戻す（ランクは月1回見直し）
 const R_SINCE = new Date(2026, 8, 1);
 let rHidden = new Map();
-const rShown = c => c.listed || c.hasRec || c.catalogTarget || [...c.events, ...c.visits].some(e => e.date && e.date >= R_SINCE);
+const rShown = c => c.listed || c.rOk || c.hasRec ||c.catalogTarget || [...c.events, ...c.visits].some(e => e.date && e.date >= R_SINCE);
 function finalize() {
   for (const [code, c] of customers) if (c.rank === 'R' && !rShown(c)) { customers.delete(code); rHidden.set(code, c); }
   for (const c of customers.values()) {
@@ -1300,8 +1302,48 @@ function loadXLSX() {
     document.head.appendChild(s);
   });
 }
+/* 地図用データ.json（C:\PAD\map_data\map_data.py が作る）: 1人分を今のExcelの行と同じ形にして ingest に渡す。
+   家電の「一覧」の1番目が テレビ1、2番目が テレビ2 …（台数の上限なし）。「活動」があれば ②⑥⑦ の代わりに使う */
+const JSON_DATA = '地図用データ.json';
+const isJsonData = name => name === JSON_DATA;
+let jsonSrc = {};   // 元データの更新日時（顧客CSV・所有CSV・基本azyamedata）と作成日時 (ms)
+function jsonToRows(d) {
+  if (!d || !Array.isArray(d['顧客'])) throw new Error(`${JSON_DATA} の形が想定と違います`);
+  jsonSrc = {};
+  for (const [k, v] of Object.entries(d['元データの更新日時'] || {})) { const t = Date.parse(v); if (t) jsonSrc[k] = t; }
+  if (Date.parse(d['作成日時'])) jsonSrc['作成日時'] = Date.parse(d['作成日時']);
+  return d['顧客'].map(p => {
+    const row = { 顧客コード: p['顧客コード'], 顧客名称: p['顧客名称'], 住所: p['住所'], 座標: p['座標'], 緯度: p['緯度'], 経度: p['経度'],
+      顧客ランク区分: p.rank, RFMランク区分: p['RFMランク区分'], _rOk: !!p['ランクRだが接点ありで表示'], _act: p['活動'] || null };
+    for (const [name, a] of Object.entries(p['家電'] || {})) {
+      for (const k of ['台数', '自店', '他店']) if (a[k] != null) row[name + k] = a[k];
+      (a['一覧'] || []).forEach((u, i) => {
+        const g = name + (i + 1);
+        row[g + '品番'] = u['品番']; row[g + '納品日付'] = u['納品日付']; row[g + '設置場所区分'] = u['設置場所'];
+        row[g + '廃棄日付'] = u['廃棄日付']; row[g + '自他'] = u['自他']; row[g + 'メーカー'] = u['メーカー'];
+      });
+    }
+    return row;
+  });
+}
+const jsonHasActivity = d => Array.isArray(d && d['顧客']) && d['顧客'].some(p => p && p['活動']);
+// 「活動」: お店誌（予定・渡した）、チラシ（Aチラシ・B推進・C見込み）、訪問。②⑥⑦ の行と同じものを作る
+function applyActivity(c, act) {
+  const cat = act['お店誌'] || {};
+  if (cat['予定'] || (cat['渡した'] || []).length) c.catalogTarget = true;
+  const sent = (cat['渡した'] || []).map(e => staffAlias(e['担当'])).find(Boolean);
+  if (sent) c.catalog = sent;
+  const add = (list, isVisit) => { for (const e of list || []) {
+    const date = parseDate(e['日付']), staff = staffAlias(e['担当']), kind = isVisit ? '訪問' : String(e['種類'] || '');
+    const key = [isVisit ? 'v' : 'e', fmtDate(date), staff, kind].join('|');
+    if (c.keys.has(key)) continue;
+    c.keys.add(key); (isVisit ? c.visits : c.events).push({ date, staff, kind, custom: '' });
+  } };
+  add(act['チラシ'], false); add(act['訪問'], true);
+}
 async function readFile(file) {
   const buf = await file.arrayBuffer();
+  if (/\.json$/i.test(file.name)) return jsonToRows(JSON.parse(decodeText(buf)));
   if (/\.xlsx?$/i.test(file.name)) {
     const XLSX = await loadXLSX();
     // first sheet only, no formatted text: about twice as fast on the big files (dates arrive as Excel serial numbers, parseDate handles them)
@@ -1325,7 +1367,7 @@ function idb(mode, fn) {
     };
   });
 }
-const saveData = () => idb('readwrite', s => s.put({ customers: new Map([...customers, ...rHidden]), sources, srcMods, savedAt: new Date() }, 'last')).catch(() => {});
+const saveData = () => idb('readwrite', s => s.put({ customers: new Map([...customers, ...rHidden]), sources, srcMods, jsonSrc, savedAt: new Date() }, 'last')).catch(() => {});
 const loadData = () => idb('readonly', s => s.get('last')).catch(() => null);
 const clearData = () => idb('readwrite', s => s.delete('last')).catch(() => {});
 let savedAt = null;
@@ -1338,16 +1380,25 @@ const fmtTime = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMin
 // the files are normally updated together, so show one time (the newest); a file left far behind gets its own warning
 const SRC_GAP = 2 * 3600000;
 const fmtMod = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${fmtTime(d)}`; };
+// 地図用データ.json を読んだときは、ファイル自身の時刻ではなく中に書かれた元データ（顧客CSV・所有CSV・基本azyamedata）の更新日時を見せる
+const JSON_SRC_TAG = { '顧客CSV': '顧客', '所有CSV': '所有', '基本azyamedata': '基本' };
 function renderSrcMods() {
-  const names = isSample ? [] : Object.keys(srcMods).filter(n => srcMods[n]).sort((a, b) => srcRank(a) - srcRank(b) || a.localeCompare(b, 'ja'));
+  const mods = {};
+  if (!isSample) {
+    for (const n in srcMods) if (srcMods[n] && !isJsonData(n)) mods[n] = srcMods[n];
+    if (srcMods[JSON_DATA]) for (const k in jsonSrc) if (k !== '作成日時') mods[k] = jsonSrc[k];
+  }
+  const tag = n => JSON_SRC_TAG[n] || srcTag(n);
+  const names = Object.keys(mods).sort((a, b) => srcRank(a) - srcRank(b) || a.localeCompare(b, 'ja'));
   const box = $('#srcMods');
   box.hidden = !names.length;
   if (!names.length) { box.innerHTML = ''; return; }
-  const last = Math.max(...names.map(n => srcMods[n]));
-  const behind = names.filter(n => last - srcMods[n] > SRC_GAP);
-  const old = behind.length === 1 ? `${esc(srcTag(behind[0]))}だけ ${fmtMod(srcMods[behind[0]])}`
-    : behind.map(n => `${esc(srcTag(n))} ${fmtMod(srcMods[n])}`).join('・');
-  box.innerHTML = behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`;
+  const last = Math.max(...names.map(n => mods[n]));
+  const behind = names.filter(n => last - mods[n] > SRC_GAP);
+  const old = behind.length === 1 ? `${esc(tag(behind[0]))}だけ ${fmtMod(mods[behind[0]])}`
+    : behind.map(n => `${esc(tag(n))} ${fmtMod(mods[n])}`).join('・');
+  const made = srcMods[JSON_DATA] && jsonSrc['作成日時'] ? `<br>地図用データ作成：${fmtMod(jsonSrc['作成日時'])}` : '';
+  box.innerHTML = (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) + made;
 }
 // OneDrive has something newer than this device shows: orange button that asks to load it, and a dot on メニュー
 const OD_LABEL = { odBtn: 'OneDriveから最新を読み込む', viewBtn: '最新のお客様データを表示' };
@@ -1383,7 +1434,7 @@ const odFile = async f => {
 
 async function importFiles(files) {
   if (!files.length) return;
-  if (isSample || freshNext) { customers = new Map(); rHidden = new Map(); sources = []; srcMods = {}; isSample = false; }
+  if (isSample || freshNext) { customers = new Map(); rHidden = new Map(); sources = []; srcMods = {}; jsonSrc = {}; isSample = false; }
   else for (const [code, c] of rHidden) customers.set(code, c);   // adding files: put the hidden ランクR people back so their rows merge
   freshNext = false; srcNewer = false;
   let rows = 0; const bad = [];
@@ -2063,11 +2114,29 @@ function applyRole() {
   $('#checkSince').closest('.datepick').classList.toggle('ro', v);
 }
 const DEFAULT_SKIP = /^【(?!毎日)|4月1日から/;   // 【毎日③】所有azyamedata is wanted
-const isDataFile = i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name);
+const isDataFile = i => i.file && (/\.(xlsx|xls|csv)$/i.test(i.name) || isJsonData(i.name)) && !/^~\$/.test(i.name);
+const isMasterXlsx = name => /所有azyamedata/i.test(name);
 async function odDownload(list) {
   const got = [];
   for (const f of list) got.push(await odFile(f));
   return got;
+}
+// 地図用データ.json があれば 地図用_所有azyamedata.xlsx は読まない。「活動」入りなら ②⑥⑦ も読まない。
+// JSONが読めないときは、しばらく今までのExcelで表示する
+async function odLoadFiles(pick, all) {
+  const jf = pick.find(f => isJsonData(f.name));
+  if (!jf) return odDownload(pick);
+  const json = await odFile(jf);
+  let d = null;
+  try { d = JSON.parse(decodeText(await json.arrayBuffer())); jsonToRows(d); } catch { d = null; }
+  const rest = pick.filter(f => f !== jf);
+  if (!d) {
+    toast(`${JSON_DATA} を読めなかったので、今までのExcel（地図用_所有azyamedata.xlsx）で表示します`, 7000);
+    const x = all.find(f => isMasterXlsx(f.name) && !rest.includes(f));
+    return odDownload(x ? [...rest, x] : rest);
+  }
+  const act = jsonHasActivity(d);
+  return [...await odDownload(rest.filter(f => !isMasterXlsx(f.name) && !act)), json];
 }
 async function odWhoAmI(token) {
   const me = await graph('/me?$select=userPrincipalName', token);
@@ -2113,7 +2182,7 @@ async function odViewerLoad(auto) {
     const files = r.value;
     if (!files) return;
     if (!files.length) throw new Error('共有フォルダにデータが見つかりませんでした');
-    const got = await odDownload(files);
+    const got = await odLoadFiles(files, files);
     freshNext = true;
     await importFiles(got);
   } catch (e) {
@@ -2649,12 +2718,14 @@ async function odShowList() {
     if (r.needLogin) { lsSet('yame-od-pending', true); await odLogin(); return; }
     await odReadSettings(r.value);
     checkNewer(r.value);
-    const files = r.value.filter(i => i.file && /\.(xlsx|xls|csv)$/i.test(i.name) && !/^~\$/.test(i.name))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    const files = r.value.filter(isDataFile).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
     const skip = new Set(lsGet('yame-od-skip') || files.filter(f => DEFAULT_SKIP.test(f.name)).map(f => f.name));
+    // 地図用データ.json があれば、所有azyamedata のExcelは読まない（JSONが読めないときだけ代わりに使う）
+    const hasJson = files.some(f => isJsonData(f.name));
+    const note = f => hasJson && isMasterXlsx(f.name) ? '・地図用データ.jsonがあるので読みません' : isJsonData(f.name) ? '・お店誌や接点も入っていれば②⑥⑦は読みません' : '';
     box.innerHTML = '<b>読み込むファイル</b>' + files.map((f, i) =>
-      `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} ${fmtTime(new Date(f.lastModifiedDateTime))} 更新</span></span></label>`).join('') +
+      `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) || (hasJson && isMasterXlsx(f.name)) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} ${fmtTime(new Date(f.lastModifiedDateTime))} 更新${note(f)}</span></span></label>`).join('') +
       '<div class="row"><button class="btn primary" id="odGo" type="button">この内容で読み込む</button><button class="btn" id="odClose" type="button">閉じる</button></div>';
     $('#odClose').onclick = () => { box.hidden = true; };
     $('#odGo').onclick = async () => {
@@ -2664,7 +2735,7 @@ async function odShowList() {
       if (!pick.length) { toast('ファイルを1つ以上選んでください', 3000); return; }
       box.textContent = `${pick.length}ファイルをダウンロードしています…`;
       try {
-        const got = await odDownload(pick);
+        const got = await odLoadFiles(pick, files);
         box.hidden = true;
         freshNext = true;
         await importFiles(got);
@@ -2813,7 +2884,7 @@ if (viewerMode()) { customers = new Map(); sources = []; isSample = false; }   /
 rebuild(true);
 loadData().then(d => {
   if (d && d.customers instanceof Map && d.customers.size && (isSample || !customers.size)) {
-    customers = d.customers; sources = d.sources || []; srcMods = d.srcMods || {}; savedAt = d.savedAt || null; isSample = false;
+    customers = d.customers; sources = d.sources || []; srcMods = d.srcMods || {}; jsonSrc = d.jsonSrc || {}; savedAt = d.savedAt || null; isSample = false;
     applyRecords(); rebuild(true); recLoad(); renderSrcMods();
     toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
   }
