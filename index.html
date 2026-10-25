@@ -662,7 +662,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
 .acount{display:inline-block;margin-top:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:none;color:var(--accent,#1a73e8);cursor:pointer}
-.aunits{margin-top:4px;border-left:3px solid var(--line);padding-left:8px}.aunit{font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line)}.aunit:last-child{border-bottom:0}
+/* 全N台の一覧は家電の行の下に、カードの幅いっぱいを使って出す */
+.aunits{grid-column:1/-1;margin-top:-2px;border-left:3px solid var(--line);padding-left:8px;color:var(--muted)}.aunits[hidden]{display:none}
+.aunit{font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line)}.aunit:last-child{border-bottom:0}
+.aunit .au2{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:1px}
+.aunit .au3{margin-top:2px}
+#odBox .odfile{font-size:14px;margin:4px 0}#odBox .d{font-size:12px;color:var(--muted)}
 #rfWarn{font-size:12px;color:#b45309;background:#fff7e6;border-radius:6px;padding:6px 8px}#rfWarn:empty{display:none}
 .acheck{margin-left:6px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);cursor:pointer}
 /* our own date text (the browser's date box showed an empty weekday); the real input sits invisibly on top so a tap opens its picker */
@@ -1033,8 +1038,8 @@ const DIMS = {
   rice:  { label:'炊飯器 所有年数', order:ageOrder('炊飯器'), colors:ageCols('炊飯器'), get:c => ageBucket(c, '炊飯器') },
   range: { label:'レンジ 所有年数', order:ageOrder('レンジ'), colors:ageCols('レンジ'), get:c => ageBucket(c, 'レンジ') },
   ih:    { label:'熱源 所有年数', order:ageOrder('IH'), colors:ageCols('IH'), get:c => ageBucket(c, 'IH') },
-  stage: { label:'接点段階', order:['見込み','推進','チラシ','その他','接点なし'],
-           colors:{'見込み':'#c2362b','推進':'#e07b25','チラシ':'#2f68c8','その他':'#7b5fc0','接点なし':GREY}, get:c => c.stage },
+  stage: { label:'接点段階', order:['見込み','推進','チラシ','その他','チラシ等なし'],
+           colors:{'見込み':'#c2362b','推進':'#e07b25','チラシ':'#2f68c8','その他':'#7b5fc0','チラシ等なし':GREY}, get:c => c.stage },
   visit: { label:'訪問確認', order:['訪問済み','未訪問'], colors:{'訪問済み':'#0b6e4f','未訪問':GREY}, get:c => c.visits.length ? '訪問済み' : '未訪問' },
 };
 const EXTRA = ['#5b7083','#a0522d','#6b8e23','#4682b4','#9370db','#cd5c5c'];
@@ -1128,7 +1133,7 @@ function stageOf(kind) {
   if (/チラシ/.test(kind)) return 'チラシ';
   return 'その他';
 }
-const STAGE_RANK = { '見込み':4, '推進':3, 'チラシ':2, 'その他':1, '接点なし':0 };
+const STAGE_RANK = { '見込み':4, '推進':3, 'チラシ':2, 'その他':1, 'チラシ等なし':0 };
 function catOf(prefix) {
   prefix = prefix.replace(/サブ$/, '');   // 冷蔵庫サブ1 etc. are the same kind of appliance
   if (/炊飯/.test(prefix)) return '炊飯器';
@@ -1242,7 +1247,7 @@ function finalize() {
     const all = [...c.events, ...c.visits].filter(e => e.staff);
     all.sort((a, b) => (b.date || 0) - (a.date || 0));
     c.staff = all.length ? all[0].staff : '';
-    c.stage = c.events.reduce((best, e) => { const s = stageOf(e.kind); return STAGE_RANK[s] > STAGE_RANK[best] ? s : best; }, '接点なし');
+    c.stage = c.events.reduce((best, e) => { const s = stageOf(e.kind); return STAGE_RANK[s] > STAGE_RANK[best] ? s : best; }, 'チラシ等なし');
     c.vals = {};
     for (const k in DIMS) c.vals[k] = DIMS[k].get(c);
     c.search = normQ(c.name);
@@ -1398,7 +1403,9 @@ function renderSrcMods() {
   const old = behind.length === 1 ? `${esc(tag(behind[0]))}だけ ${fmtMod(mods[behind[0]])}`
     : behind.map(n => `${esc(tag(n))} ${fmtMod(mods[n])}`).join('・');
   const made = srcMods[JSON_DATA] && jsonSrc['作成日時'] ? `<br>地図用データ作成：${fmtMod(jsonSrc['作成日時'])}` : '';
-  box.innerHTML = (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) + made;
+  // 予備（今までのExcel）で表示しているときだけ小さく知らせる
+  const fallback = !srcMods[JSON_DATA] ? `<span class="warn">${JSON_DATA} が読めないので古いファイルで表示しています</span><br>` : '';
+  box.innerHTML = fallback + (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) + made;
 }
 // OneDrive has something newer than this device shows: orange button that asks to load it, and a dot on メニュー
 const OD_LABEL = { odBtn: 'OneDriveから最新を読み込む', viewBtn: '最新のお客様データを表示' };
@@ -1966,16 +1973,21 @@ function select(code, pan) {
     const cn = (c.cnt && c.cnt[cat]) || null;
     const n = Math.max(cn ? cn.n || 0 : 0, units.length);
     const cntTxt = cn && n ? `全${n}台（自店${cn.own || 0}・他店${cn.other || 0}）` : `全${n}台`;
-    const more = n > 1 ? `<button type="button" class="acount" data-aunits="${esc(cat)}">${cntTxt} ▼</button><div class="aunits" data-units="${esc(cat)}" hidden>${
-      [...units].sort((x, y) => (y.date || 0) - (x.date || 0)).map((u, i) => `<div class="aunit"><b>${i + 1}</b> ${esc(u.model) || '（型式なし）'}<br>${whenOf(u)}${u.place ? '・' + esc(u.place) : ''}${u.hold ? HOLD_TAG : ''}${u.date ? '・' + fmtAge(u.date) : ''}${seenOf(u) ? '<br>' + seenOf(u) : ''}${chkBtn(cat, u)}</div>`).join('')
-      }${n > units.length ? `<div class="aunit">店クラウドVには${n}台あります（地図には${units.length}台分の詳細）。残りは店クラウドVで確認してください</div>` : ''}</div>` : cn && cn.other ? '他店で購入' : '';
-    if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし${n ? '<br>' + more : ''}</span><span></span>`;
+    const ageTag = u => { const col = TH[cat] ? ageCol(cat, u) : '#6a7280'; return `<span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${fmtAge(u.date)}</span>`; };
+    // each unit: 1行目 番号と品番、2行目 納品日（左）と経過年数の札（右）、その下に確認日・確認・変更
+    const more = n > 1 ? `<button type="button" class="acount" data-aunits="${esc(cat)}">${cntTxt} ▼</button>` : cn && cn.other ? '他店で購入' : '';
+    const list = n > 1 ? `<div class="aunits" data-units="${esc(cat)}" hidden>${
+      [...units].sort((x, y) => (y.date || 0) - (x.date || 0)).map((u, i) => `<div class="aunit"><div><b>${i + 1}</b> ${esc(u.model) || '（型式なし）'}</div>
+        <div class="au2"><span>${whenOf(u)}${u.place ? '・' + esc(u.place) : ''}${u.hold ? HOLD_TAG : ''}</span>${u.date ? ageTag(u) : ''}</div>${
+        seenOf(u) || chkBtn(cat, u) ? `<div class="au3">${seenOf(u)}${chkBtn(cat, u)}</div>` : ''}</div>`).join('')
+      }${n > units.length ? `<div class="aunit">店クラウドVには${n}台あります（地図には${units.length}台分の詳細）。残りは店クラウドVで確認してください</div>` : ''}</div>` : '';
+    if (!a) return `<span class="k">${esc(catName)}</span><span class="m">所有情報なし${more ? '<br>' + more : ''}</span><span></span>${list}`;
     const seen = seenOf(a) ? '<br>' + seenOf(a) : '';
     const info = (a.date ? `${esc(a.model)}<br>${whenOf(a)}${a.place ? '・' + esc(a.place) : ''}` : a.hold ? esc(a.model) || '（型式なし）' : '納品記録なし')
       + (a.hold || units.some(u => u.hold) ? HOLD_TAG : '');   // a held unit behind 全n台 ▼ is flagged on the main line too
     const ageTxt = a.date ? fmtAge(a.date) : `${TH[cat]}年${a.over ? '以上' : '未満'}`;
     const col = TH[cat] ? ageCol(cat, a) : '#6a7280';   // only 炊飯器・レンジ・IH have a 案内 threshold
-    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}${chkBtn(cat, a)}${more ? '<br>' + more : ''}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>`;
+    return `<span class="k">${esc(catName)}</span><span class="m">${info}${seen}${chkBtn(cat, a)}${more ? '<br>' + more : ''}</span><span class="age" style="background:${col};color:${col === OVER ? '#000' : '#fff'}">${ageTxt}</span>${list}`;
   }).join('');
   const hist = (arr, empty) => arr.length ? `<ul class="hist">${[...arr].sort((a, b) => (b.date || 0) - (a.date || 0)).map(e =>
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
@@ -2121,22 +2133,18 @@ async function odDownload(list) {
   for (const f of list) got.push(await odFile(f));
   return got;
 }
-// 地図用データ.json があれば 地図用_所有azyamedata.xlsx は読まない。「活動」入りなら ②⑥⑦ も読まない。
-// JSONが読めないときは、しばらく今までのExcelで表示する
-async function odLoadFiles(pick, all) {
-  const jf = pick.find(f => isJsonData(f.name));
-  if (!jf) return odDownload(pick);
-  const json = await odFile(jf);
-  let d = null;
-  try { d = JSON.parse(decodeText(await json.arrayBuffer())); jsonToRows(d); } catch { d = null; }
-  const rest = pick.filter(f => f !== jf);
-  if (!d) {
-    toast(`${JSON_DATA} を読めなかったので、今までのExcel（地図用_所有azyamedata.xlsx）で表示します`, 7000);
-    const x = all.find(f => isMasterXlsx(f.name) && !rest.includes(f));
-    return odDownload(x ? [...rest, x] : rest);
+// 読むのは 地図用データ.json だけ（「活動」入りなら ②⑥⑦ も要らない）。
+// JSONが無い・読めないときだけ、裏で今までのExcel（地図用_所有azyamedata.xlsx・②⑥⑦）を読む
+async function odLoadFiles(all) {
+  const old = all.filter(f => !isJsonData(f.name) && !DEFAULT_SKIP.test(f.name));
+  const jf = all.find(f => isJsonData(f.name));
+  let d = null, json = null;
+  if (jf) {
+    json = await odFile(jf);
+    try { d = JSON.parse(decodeText(await json.arrayBuffer())); jsonToRows(d); } catch { d = null; }
   }
-  const act = jsonHasActivity(d);
-  return [...await odDownload(rest.filter(f => !isMasterXlsx(f.name) && !act)), json];
+  if (!d) return odDownload(old);
+  return [...await odDownload(jsonHasActivity(d) ? [] : old.filter(f => !isMasterXlsx(f.name))), json];
 }
 async function odWhoAmI(token) {
   const me = await graph('/me?$select=userPrincipalName', token);
@@ -2182,7 +2190,7 @@ async function odViewerLoad(auto) {
     const files = r.value;
     if (!files) return;
     if (!files.length) throw new Error('共有フォルダにデータが見つかりませんでした');
-    const got = await odLoadFiles(files, files);
+    const got = await odLoadFiles(files);
     freshNext = true;
     await importFiles(got);
   } catch (e) {
@@ -2720,22 +2728,18 @@ async function odShowList() {
     checkNewer(r.value);
     const files = r.value.filter(isDataFile).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     if (!files.length) { box.textContent = 'フォルダにExcel・CSVが見つかりませんでした。'; return; }
-    const skip = new Set(lsGet('yame-od-skip') || files.filter(f => DEFAULT_SKIP.test(f.name)).map(f => f.name));
-    // 地図用データ.json があれば、所有azyamedata のExcelは読まない（JSONが読めないときだけ代わりに使う）
-    const hasJson = files.some(f => isJsonData(f.name));
-    const note = f => hasJson && isMasterXlsx(f.name) ? '・地図用データ.jsonがあるので読みません' : isJsonData(f.name) ? '・お店誌や接点も入っていれば②⑥⑦は読みません' : '';
-    box.innerHTML = '<b>読み込むファイル</b>' + files.map((f, i) =>
-      `<label><input type="checkbox" data-i="${i}"${skip.has(f.name) || (hasJson && isMasterXlsx(f.name)) ? '' : ' checked'}><span>${esc(f.name)}<br><span class="d">${fmtDate(new Date(f.lastModifiedDateTime))} ${fmtTime(new Date(f.lastModifiedDateTime))} 更新${note(f)}</span></span></label>`).join('') +
-      '<div class="row"><button class="btn primary" id="odGo" type="button">この内容で読み込む</button><button class="btn" id="odClose" type="button">閉じる</button></div>';
+    // 一覧に出すのは 地図用データ.json だけ（ほかのExcelは、JSONが無い・読めないときに裏で使う予備）
+    const jf = files.find(f => isJsonData(f.name));
+    box.innerHTML = '<b>読み込むファイル</b>' + (jf
+      ? `<div class="odfile">${esc(jf.name)}<br><span class="d">${fmtDate(new Date(jf.lastModifiedDateTime))} ${fmtTime(new Date(jf.lastModifiedDateTime))} 更新</span></div>`
+      : `<div class="odfile">${esc(JSON_DATA)} が見つかりません。今までのファイルで表示します</div>`) +
+      '<div class="d">記録フォルダ（地図アプリでつけた記録）も一緒に読みます</div>' +
+      '<div class="row"><button class="btn primary" id="odGo" type="button">読み込む</button><button class="btn" id="odClose" type="button">閉じる</button></div>';
     $('#odClose').onclick = () => { box.hidden = true; };
     $('#odGo').onclick = async () => {
-      const boxes = [...box.querySelectorAll('input[data-i]')];
-      lsSet('yame-od-skip', boxes.filter(b => !b.checked).map(b => files[+b.dataset.i].name));
-      const pick = boxes.filter(b => b.checked).map(b => files[+b.dataset.i]);
-      if (!pick.length) { toast('ファイルを1つ以上選んでください', 3000); return; }
-      box.textContent = `${pick.length}ファイルをダウンロードしています…`;
+      box.textContent = 'ダウンロードしています…';
       try {
-        const got = await odLoadFiles(pick, files);
+        const got = await odLoadFiles(files);
         box.hidden = true;
         freshNext = true;
         await importFiles(got);
