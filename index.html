@@ -2881,7 +2881,7 @@ setPanel(panelOpen);
 $('#panelToggle').addEventListener('click', () => { panelOpen = !panelOpen; setPanel(panelOpen); });
 // 現在地: centre once on press, then keep the blue dot following the phone
 // 押すたびに 中域12段階 → 詳細16段階 → 広域10段階 → 中域12 … と大きさが変わる（航空写真は写真のある大きさまで）
-const ME_STAGE = { mid: 12, near: 16, wide: 10 };   // ← 詳細へ飛ぶ段階を15にするなら near: 15
+const ME_STAGE = { mid: 12, near: 15, wide: 10 };   // 2回目に押したときの段階（15＝ズーム19。区分では中域の一番上）
 const ME_CYCLE = [ME_STAGE.mid, ME_STAGE.near, ME_STAGE.wide].map(s => s + STAGE0);
 let meCycle = 0, meZoom = ME_CYCLE[0];
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
