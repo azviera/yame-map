@@ -667,6 +667,10 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .aunit{font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line)}.aunit:last-child{border-bottom:0}
 .aunit .au2{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:1px}
 .aunit .au3{margin-top:2px}
+/* ほかの人が記録したお客様: 数秒だけ、やわらかく広がる輪 */
+.rec-pulse i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:3px solid #ff9800;box-shadow:0 0 0 2px rgba(255,255,255,.8);animation:recPulse 1.5s ease-out 4;pointer-events:none}
+@keyframes recPulse{0%{transform:scale(.5);opacity:1}100%{transform:scale(1.8);opacity:0}}
+@media (prefers-reduced-motion:reduce){.rec-pulse i{animation:none;opacity:.9}}
 #odBox .odfile{font-size:14px;margin:4px 0}#odBox .d{font-size:12px;color:var(--muted)}
 #rfWarn{font-size:12px;color:#b45309;background:#fff7e6;border-radius:6px;padding:6px 8px}#rfWarn:empty{display:none}
 .acheck{margin-left:6px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);cursor:pointer}
@@ -896,6 +900,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div id="odBox" hidden></div>
       <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
       <div id="recState" class="recstate"></div>
+      <div id="recOthers" class="recstate"></div>
       <div class="row"><button class="btn" id="recExport" type="button">記録を書き出す（CSV）</button></div>
       <div id="recExportBox" hidden class="recstate">
         <label><input type="checkbox" id="recOnlyNew" checked> 店クラウドVに未入力の分だけ</label>
@@ -2428,11 +2433,13 @@ function recAdd(ev) {
   recRedraw();
   recFlush(true);
 }
-let recFlushing = false;
+let recFlushing = false, recFlushAgain = false;
 // user: the person just pressed 保存 (only then may we send them to the sign-in page, and at most once in 10 minutes)
+// 押したらすぐ送る。送っている途中に次の記録が来たら、終わってすぐもう一度送る
 async function recFlush(user) {
-  if (recFlushing || !recPending.length || !odReady() || !navigator.onLine) { renderRecState(); return; }
-  recFlushing = true;
+  if (recFlushing) { recFlushAgain = true; return; }
+  if (!recPending.length || !odReady() || !navigator.onLine) { renderRecState(); return; }
+  recFlushing = true; recFlushAgain = false;
   try {
     const sending = recPending.slice();
     const name = `${squash(lsGet('yame-rec-staff') || 'x')}_${writerId}_${isoDay(new Date()).replace(/-/g, '')}.json`;
@@ -2447,10 +2454,12 @@ async function recFlush(user) {
       const merged = existing.concat(sending.filter(e => !ids.has(e.id)));
       const p = await fetch(base, { method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(merged) });
       if (!p.ok) { const e = new Error(`記録を保存できませんでした（${p.status}）`); e.status = p.status; throw e; }
-      return merged;
+      let mod = new Date().toISOString();
+      try { mod = (await p.json()).lastModifiedDateTime || mod; } catch {}   // the server's time, so the next check doesn't download our own file again
+      return { merged, mod };
     });
     if (r.needLogin) { if (user) toast('記録を送るにはサインインが必要です。「最新のお客様データを表示」からサインインしてください（記録はこの端末に残しています）', 7000); renderRecState(); return; }
-    recFiles[name] = { mod: new Date().toISOString(), events: r.value };
+    recFiles[name] = { mod: r.value.mod, events: r.value.merged };
     lsSet('yame-rec-files', recFiles);
     const sent = new Set(sending.map(e => e.id));
     recPending = recPending.filter(e => !sent.has(e.id)); lsSet('yame-rec-pending', recPending);
@@ -2466,35 +2475,82 @@ async function recFlush(user) {
       } else if (user) toast('書き込みの許可がまだ下りていません（管理者の同意待ち）。記録はこの端末に残しています', 7000);
     } else if (e.status === 403) toast('「記録」フォルダに書き込む権限がありません。たかのぶさんに「記録」フォルダを「編集可」で共有してもらってください', 9000);
     else toast(e.message + '（記録はこの端末に残しています）', 6000);
-  } finally { recFlushing = false; renderRecState(); }
+  } finally {
+    recFlushing = false; renderRecState();
+    if (recFlushAgain && recPending.length) setTimeout(() => recFlush(), 0);
+  }
 }
 // read everyone's record files (only the ones that changed since last time)
+const recBase = () => `/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(REC_DIR)}`;
+let recLoadedOnce = false;
 async function recLoad() {
   if (!odReady()) return;
   try {
+    const before = new Set(recAllEvents().map(e => e.id));
     const r = await odRetry401(async token => {
       if (!odFolderRef) await odFolderChildren(token);
       let list;
-      try { list = (await graph(`/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(REC_DIR)}:/children?$top=999`, token)).value; }
+      // only the few fields needed (keeps each check small even with many files)
+      try { list = (await graph(`${recBase()}:/children?$top=999&$select=id,name,lastModifiedDateTime,file`, token)).value; }
       catch (e) { if (e.status === 404) return null; throw e; }
       let changed = false;
       const names = new Set();
       for (const f of list.filter(i => i.file && /\.json$/i.test(i.name))) {
         names.add(f.name);
         if (recFiles[f.name] && recFiles[f.name].mod === f.lastModifiedDateTime) continue;
-        const ev = await (await fetch(f['@microsoft.graph.downloadUrl'])).json();
+        const res = await fetch(`https://graph.microsoft.com/v1.0/drives/${odFolderRef.drive}/items/${f.id}/content`, { headers: { Authorization: 'Bearer ' + token } });
+        if (!res.ok) continue;
+        const ev = await res.json();
         recFiles[f.name] = { mod: f.lastModifiedDateTime, events: Array.isArray(ev) ? ev : [] };
         changed = true;
       }
       for (const n of Object.keys(recFiles)) if (!names.has(n)) { delete recFiles[n]; changed = true; }
       return changed;
     });
-    if (r.value) { lsSet('yame-rec-files', recFiles); recRedraw(); }
+    if (r.value) {
+      lsSet('yame-rec-files', recFiles); recRedraw();
+      if (recLoadedOnce) recAnnounce(recAllEvents().filter(e => !before.has(e.id) && e.writer !== writerId));
+    }
+    recLoadedOnce = true;
     recFlush();
   } catch (e) { /* records are optional; the map still works */ }
 }
-window.addEventListener('online', recFlush);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') recFlush(); });
+/* ほかの人の記録をほぼリアルタイムで: 画面に出ている間、1分ごとに「記録」フォルダの大きさと更新時刻だけを聞き（数百バイト）、
+   変わっていたら変わったファイルだけ読む。念のため10分に1回は一覧も見る。画面を閉じている間は止め、戻ったらすぐ1回 */
+const REC_POLL = 60000, REC_FULL = 600000;
+let recSig = '', recFullAt = 0, recPollT = null, recPolling = false;
+async function recPoll() {
+  clearTimeout(recPollT); recPollT = null;
+  if (document.visibilityState !== 'visible') return;
+  recPollT = setTimeout(recPoll, REC_POLL);
+  if (recPolling || !odReady() || !navigator.onLine || !lsGet('yame-od-tok') || !customers.size || isSample) return;
+  recPolling = true;
+  try {
+    const t = await odToken(); if (!t) return;   // never sends anyone to the sign-in page from here
+    if (!odFolderRef) await odFolderChildren(t);
+    const it = await graph(`${recBase()}?$select=size,lastModifiedDateTime`, t);
+    const sig = `${it.size}|${it.lastModifiedDateTime}`;
+    if (sig !== recSig || Date.now() - recFullAt > REC_FULL) { recSig = sig; recFullAt = Date.now(); await recLoad(); }
+  } catch { /* no signal or a passing error: try again next time, quietly */ }
+  finally { recPolling = false; }
+}
+// new records from someone else: a soft pulse on those customers for a few seconds, and one quiet line in the menu
+function recAnnounce(evs) {
+  const recs = evs.filter(e => e.op === 'put' && e.rec).map(e => e.rec);
+  if (!recs.length) return;
+  for (const r of recs) {
+    const c = customers.get(r.code); if (!c || c.lat == null) continue;
+    const m = L.marker([c.lat, c.lng], { interactive: false, keyboard: false, zIndexOffset: 3000,
+      icon: L.divIcon({ className: 'rec-pulse', html: '<i></i>', iconSize: [0, 0] }) }).addTo(map);
+    setTimeout(() => map.removeLayer(m), 6000);
+  }
+  const r = recs[recs.length - 1];
+  const who = [...new Set(recs.map(x => x.staff).filter(Boolean))].join('・');
+  $('#recOthers').textContent = `ほかの人の記録 ${recs.length}件（${who}・${fmtTime(new Date())}）：${r.name || r.code} ${r.kind}${recs.length > 1 ? ' ほか' : ''}`;
+}
+window.addEventListener('online', () => { recFlush(); recPoll(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { recFlush(); recPoll(); } });
+setTimeout(recPoll, 5000);
 
 // the entry form: 商品・メーカー・設置場所 use 店クラウドV's own choices, so the CSV can be entered as is
 const V_PRODUCTS = {
