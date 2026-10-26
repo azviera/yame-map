@@ -905,9 +905,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div class="widesel"><label for="dim">ピンの丸の色分け</label><select id="dim"></select></div>
       <div class="widesel"><span>広域で出すアイコン（引いた地図・1〜11段階）</span>
         <button type="button" class="iconpick" id="widePick"></button></div>
-      <div class="widesel"><span>中域で出すアイコン（12〜15段階）</span>
+      <div class="widesel"><span>中域で出すアイコン（12〜14段階）</span>
         <button type="button" class="iconpick" id="midPick"></button></div>
-      <div class="widesel"><span>詳細で出すアイコン（いちばん拡大・16〜18段階）</span>
+      <div class="widesel"><span>詳細で出すアイコン（いちばん拡大・15〜18段階）</span>
         <button type="button" class="iconpick" id="nearPick"></button></div>
       <div class="widesel"><label for="checkSince">黄色い✓：この日以降に確認したもの</label>
         <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色い✓の基準日"></div></div>
@@ -1680,8 +1680,8 @@ let query = '';
 let selected = null;
 
 // 拡大の段階: iPhoneで数えて1〜18（いちばん引いた所が1）＝ズーム5〜22なので、段階n＝ズームn+4。
-// 1〜11段階（ズーム15以下）＝広域、12〜15段階（16〜19）＝中域、16〜18段階（20〜22）＝詳細。区分ごとに出すアイコンを選べる
-const STAGE0 = 4, MID_ZOOM = 16, NEAR_ZOOM = 20;
+// 1〜11段階（ズーム15以下）＝広域、12〜14段階（16〜18）＝中域、15〜18段階（19〜22）＝詳細。区分ごとに出すアイコンを選べる
+const STAGE0 = 4, MID_ZOOM = 16, NEAR_ZOOM = 19;
 const zoneOf = (z = map.getZoom()) => z >= NEAR_ZOOM ? 'near' : z >= MID_ZOOM ? 'mid' : 'wide';
 const DOT_FULL_ZOOM = 15;   // 色の点・広域のアイコンが一番大きくなるズーム
 const LOGOS = [
@@ -1794,7 +1794,7 @@ function chipIcon(k) {
     visit: glyph('訪', staffColor('タ'), 'w'), name: '<i class="lb-b" style="background:#333;color:#fff">名</i>' }[k] || '';
 }
 const pickSet = zoneSet;
-const PICK_TITLE = { wide: '広域（1〜11段階）で出すアイコン', mid: '中域（12〜15段階）で出すアイコン', near: '詳細（16〜18段階）で出すアイコン' };
+const PICK_TITLE = { wide: '広域（1〜11段階）で出すアイコン', mid: '中域（12〜14段階）で出すアイコン', near: '詳細（15〜18段階）で出すアイコン' };
 function renderPicks() {
   for (const which of ['wide', 'mid', 'near']) {
     const s = pickSet(which);
@@ -2881,7 +2881,7 @@ setPanel(panelOpen);
 $('#panelToggle').addEventListener('click', () => { panelOpen = !panelOpen; setPanel(panelOpen); });
 // 現在地: centre once on press, then keep the blue dot following the phone
 // 押すたびに 中域12段階 → 詳細16段階 → 広域10段階 → 中域12 … と大きさが変わる（航空写真は写真のある大きさまで）
-const ME_STAGE = { mid: 12, near: 15, wide: 10 };   // 2回目に押したときの段階（15＝ズーム19。区分では中域の一番上）
+const ME_STAGE = { mid: 12, near: 15, wide: 10 };   // 2回目に押したときの段階（15＝ズーム19＝詳細のいちばん引いた所）
 const ME_CYCLE = [ME_STAGE.mid, ME_STAGE.near, ME_STAGE.wide].map(s => s + STAGE0);
 let meCycle = 0, meZoom = ME_CYCLE[0];
 let meDot = null, meRing = null, meWatch = null, meCentre = false;
