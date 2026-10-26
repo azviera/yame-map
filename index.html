@@ -933,6 +933,7 @@ details.more .row{margin-top:6px}
 .ph.seed{background:#8a6a2f}.ph.grow{background:#3f8a4f}.ph.harvest{background:#c58a12}.ph.done{background:#8a8f96}
 .bar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);margin-right:6px;vertical-align:middle;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent)}
+.sum-rate{font-size:13px}
 .df{margin-left:4px;font-size:11px;font-weight:700}.df.up{color:#1f8a4c}.df.dn{color:#c62828}
 </style>
 
@@ -1031,10 +1032,12 @@ details.more .row{margin-top:6px}
       <label><input type="checkbox" name="kind" value="カレンダー">カレンダー</label>
       <label><input type="checkbox" name="kind" value="訪問">訪問した</label>
       <label><input type="checkbox" name="kind" value="所有確認"><span id="rfApplTxt">新しく見つけた家電</span></label>
-      <label><input type="checkbox" name="kind" value="Aチラシ">1 チラシ</label>
-      <label><input type="checkbox" name="kind" value="B推進">2 推進</label>
-      <label><input type="checkbox" name="kind" value="C見込み">3 見込み</label>
+      <label><input type="checkbox" name="kind" value="Aチラシ"><span data-stage="Aチラシ">1 留守</span></label>
+      <label><input type="checkbox" name="kind" value="B推進"><span data-stage="B推進">2 面会</span></label>
+      <label><input type="checkbox" name="kind" value="C見込み"><span data-stage="C見込み">3 見込み</span></label>
+      <label><input type="checkbox" name="kind" value="不要">今は要らない</label>
     </div>
+    <label class="hopeOnly" hidden>見込みの家電（何の家電の見込みか）<select name="hope"><option value="">－</option><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>食洗機</option><option>ドアホン</option><option>その他</option></select></label>
     <div id="rfKindHint">いくつでも選べます（まとめて1回の「保存」で記録）。「新しく見つけた家電」はひとつだけで記録します</div>
     <div class="two">
       <label><span id="rfDateTxt">日付</span><span class="dateIn"><input name="date" data-date required inputmode="numeric" autocomplete="off" placeholder="例 20261021"><button type="button" class="dateBtn" aria-label="カレンダーで選ぶ">📅</button></span><small class="dateHint"></small></label>
@@ -1139,8 +1142,8 @@ const DIMS = {
   range: { label:'レンジ 所有年数', order:ageOrder('レンジ'), colors:ageCols('レンジ'), get:c => ageBucket(c, 'レンジ') },
   ih:    { label:'熱源 所有年数', order:ageOrder('IH'), colors:ageCols('IH'), get:c => ageBucket(c, 'IH') },
   ...Object.fromEntries(APPL_EXTRA.map(x => [x.k, { label: `${x.cat} 所有年数`, order: ageOrder(x.cat), colors: ageCols(x.cat), get: c => ageBucket(c, x.cat) }])),
-  stage: { label:'接点段階', order:['見込み','推進','チラシ','その他','チラシ等なし'],
-           colors:{'見込み':'#c2362b','推進':'#e07b25','チラシ':'#2f68c8','その他':'#7b5fc0','チラシ等なし':GREY}, get:c => c.stage },
+  stage: { label:'接点段階', order:['見込み','面会','留守','その他','チラシ等なし'],
+           colors:{'見込み':'#c2362b','面会':'#e07b25','留守':'#2f68c8','その他':'#7b5fc0','チラシ等なし':GREY}, get:c => stageName(c.stage) },
   visit: { label:'訪問確認', order:['訪問済み','未訪問'], colors:{'訪問済み':'#0b6e4f','未訪問':GREY}, get:c => c.visits.length ? '訪問済み' : '未訪問' },
 };
 const EXTRA = ['#5b7083','#a0522d','#6b8e23','#4682b4','#9370db','#cd5c5c'];
@@ -2194,7 +2197,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
   const q = c.lat != null ? `${c.lat},${c.lng}` : encodeURIComponent(c.addr);
   $('#card').innerHTML = `<div class="grab" title="上下に引っぱって大きさを変えられます"><i></i></div>
     <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}</div>
-      <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff ? '最近接点者 ' + c.staff : '未接点')}${badge('stage', c.stage)}${badge('visit', c.vals.visit)}</div></div>
+      <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff ? '最近接点者 ' + c.staff : '未接点')}${badge('stage', c.vals.stage)}${badge('visit', c.vals.visit)}</div></div>
       <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
     <div class="bd">
       <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.tels && c.tels.size ? `<div class="empty">電話 ${[...c.tels].map(t => `<a href="tel:${esc(t)}">${esc(t)}</a>`).join('・')}</div>` : ''}${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
@@ -2203,7 +2206,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
       <div class="blk recblk"><h3>記録をつける</h3>
         <div class="row catrow"><span class="lt">お店誌</span>${CATALOG.seasons.map(s => `<button class="btn sm${s === CATALOG.current ? ' cur' : ''}" type="button" data-rec="${CAT_KIND(s)}">${s}</button>`).join('')}<button class="btn sm" type="button" data-rec="カレンダー">カレンダー</button></div>
         <div class="row"><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
-        <div class="row"><button class="btn" type="button" data-rec="Aチラシ">1 チラシ</button><button class="btn" type="button" data-rec="B推進">2 推進</button><button class="btn" type="button" data-rec="C見込み">3 見込み</button></div>
+        <div class="row">${CP_KINDS.map(k => `<button class="btn" type="button" data-rec="${k}">${esc(stageLabel(k))}</button>`).join('')}<button class="btn" type="button" data-rec="不要">今は要らない</button></div>
         ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
@@ -2464,6 +2467,7 @@ async function odReadSettings(list) {
     setCheckSince(s.checkSince || '', false);
     applyCatalogSettings(s['お店誌']);
     applyCampaignSettings(s['キャンペーン']);
+    applyStageNames(s['接点の名前']);
   } catch {}
 }
 let odSettings = {};   // 地図の設定.json の中身（保存するときにほかの項目を消さないため）
@@ -2562,6 +2566,20 @@ function computeRecords() {
 }
 // キャンペーンの接点（店クラウドVの Aチラシ・B推進・C見込み）。地図では 1・2・3 の印
 const CP_KINDS = ['Aチラシ', 'B推進', 'C見込み'];
+/* 1・2・3 の名前（2026/10/27から 1留守・2面会・3見込み）。店クラウドVの欄は同じ A・B・C を使う。
+   「地図の設定.json」の "接点の名前": {"1": "留守", "2": "面会", "3": "見込み"} で変えられる。
+   3見込み＝「キャンペーンの価格がわかったら知らせて」と言われた。何の家電の見込みかも記録する */
+const STAGE_SINCE = '2026-10-27';   // 1留守・2面会・3見込みに切り替えた日
+const STAGE_NAMES = { 'Aチラシ': '留守', 'B推進': '面会', 'C見込み': '見込み' };
+const stageLabel = k => `${CP_KINDS.indexOf(k) + 1} ${STAGE_NAMES[k]}`;
+const STAGE_OF_KIND = { 'チラシ': 'Aチラシ', '推進': 'B推進', '見込み': 'C見込み' };   // stageOf() の答え → 記録の種類
+const stageName = s => STAGE_NAMES[STAGE_OF_KIND[s]] || s;
+function applyStageNames(o) {
+  if (!o) return;
+  CP_KINDS.forEach((k, i) => { const v = String(o[i + 1] || '').trim(); if (v) STAGE_NAMES[k] = v; });
+  for (const el of document.querySelectorAll('[data-stage]')) el.textContent = stageLabel(el.dataset.stage);
+  if (customers.size) recRedraw();
+}
 /* お店誌は季節ごとの号（記録の種類は お店誌春・お店誌夏・お店誌秋・お店誌冬）。地図の●★は「今配っている季節」の記録で決める。
    今の季節と期間は「地図の設定.json」の "お店誌": {"今の季節": "秋", "開始日": "2026-09-02", "終了日": "2026-11-30"} で変えられる（ここは初めの値） */
 const CATALOG = { seasons: ['春', '夏', '秋', '冬'], current: '秋', from: '2026-09-02', to: '2026-11-30' };
@@ -2624,7 +2642,7 @@ const HOLD_TAG = '<b class="holdtag">保留・製造年を確認</b>';
 function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
 /* 今日の動き: 今日（この端末の日付）の記録がある人を、記録した担当者の色の輪で光らせ続ける。押すたびにON/OFF（開くといつもOFF）。
    ONの間は、今日の記録がない人は薄く。右上に担当者ごとの件数（押すとその人の今日の場所へ） */
-const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '所有確認': '所' } };
+const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '不要': '×', '所有確認': '所' } };
 const todayTag = k => TODAY_UI.mark[k] || TODAY_UI.mark[k.replace(/(春|夏|秋|冬)$/, '')] || k.slice(0, 1);
 let todayOn = false, todayCodes = new Set();
 let todayDay = null;   // 📅で選んだ日（null＝今日）。開くといつも今日
@@ -2680,7 +2698,7 @@ function recListHTML(code) {
     const what = r.kind === '所有確認' ? `${r.status ? '【' + esc(r.status) + '】' : '【新しく見つけた】'}${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.dlv ? '・' + esc(r.dlv.replace(/-/g, '/')) + '納品' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
     const tags = (recHold(r) && !done.has(r.id) ? ' ' + HOLD_TAG : '') + (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
     const ops = r.writer === writerId ? `<span class="ops"><button type="button" data-redit="${esc(r.id)}">直す</button><button type="button" data-rdel="${esc(r.id)}">消す</button></span>` : '';
-    return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
+    return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(CP_KINDS.includes(r.kind) ? stageLabel(r.kind) + (r.hope ? '・' + r.hope : '') : r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
   }).join('')}</ul>`;
 }
 function renderRecState() {
@@ -2896,6 +2914,7 @@ function showApplFields() {
   const ks = selKinds(), isAppl = ks.includes('所有確認');
   const ex = !!(f.elements.origModel.value || f.elements.origDate.value);   // 店クラウドVに登録済みの家電の確認・変更
   $('#recForm .applOnly').hidden = !isAppl;
+  $('#recForm .hopeOnly').hidden = !ks.includes('C見込み');
   // 「新しく見つけた家電」を選んだら それだけ、ほかを選んだら「新しく見つけた家電」を隠す。何も選んでいなければ全部出す
   for (const x of $('#rfKind').querySelectorAll('input[name="kind"]'))
     x.closest('label').hidden = ks.length > 0 && (isAppl ? x.value !== '所有確認' : x.value === '所有確認');
@@ -2920,6 +2939,8 @@ $('#rfKind').addEventListener('change', e => {
   if (t.name === 'kind' && t.checked) {   // 所有確認 と ほかの種類は一緒に選ばない
     for (const x of $('#rfKind').querySelectorAll('input[name="kind"]'))
       if (x !== t && (t.value === '所有確認' || x.value === '所有確認')) x.checked = false;
+    // 1留守・2面会は訪問したということなので、「訪問した」にも自動でチェック（店頭などで違うときは外せる）
+    if ((t.value === 'Aチラシ' || t.value === 'B推進') && !recEditing.id) $('#rfKind').querySelector('input[value="訪問"]').checked = true;
   }
   showApplFields();
 });
@@ -2967,16 +2988,18 @@ $('#recForm form').addEventListener('submit', e => {
   for (const inp of e.target.querySelectorAll('input[data-date]')) if (!checkDay(inp)) { inp.focus(); toast('日付を確かめてください（例 20180223・2018/2/23）', 3500); return; }
   const f = e.target, c = customers.get(recEditing.code);
   const kinds = selKinds();
-  if (!kinds.length) { toast('「お店誌・カレンダー・訪問・所有確認・1〜3」のどれかを選んでください', 3000); return; }
+  if (!kinds.length) { toast('「お店誌・カレンダー・訪問・所有確認・1〜3・今は要らない」のどれかを選んでください', 3000); return; }
   for (const kind of kinds) if (CP_KINDS.includes(kind)) {   // 同じ印をもう一度つけようとしていないか
     const st = stageOf(kind), dupRec = [...computeRecords().recs.values()].some(r => r.code === c.code && r.kind === kind && r.id !== recEditing.id);
-    const dupV = c.events.some(ev => !ev.fromRec && stageOf(ev.kind) === st);
-    if ((dupRec || dupV) && !confirm(`このお客様には「${kind.slice(1)}」がすでに${dupV ? '店クラウドVに' : '記録に'}あります。もう一度記録しますか？`)) return;
+    const dupV = c.events.some(ev => !ev.fromRec && stageOf(ev.kind) === st && ev.date && isoDay(ev.date) >= STAGE_SINCE);   // 意味が変わる前の店クラウドVの記録は見ない
+    if ((dupRec || dupV) && !confirm(`このお客様には「${stageLabel(kind)}」がすでに${dupV ? '店クラウドVに' : '記録に'}あります。もう一度記録しますか？`)) return;
   }
   if (!kinds.includes('所有確認')) {   // お店誌・訪問・1〜3 などは、選んだ種類ごとに1件ずつ記録（形は今までと同じ）
     const date = f.elements.date.value, staff = f.elements.staff.value, memo = f.elements.memo.value.trim();
+    const hope = kinds.includes('C見込み') ? f.elements.hope.value : '';
+    if (kinds.includes('C見込み') && !hope && !confirm('何の家電の見込みかが選ばれていません。このまま保存しますか？')) return;
     kinds.forEach((kind, i) => recAdd({ op: 'put', rec: { id: (i === 0 && recEditing.id) || newId(), kind, date, staff, code: c.code, name: c.name,
-      memo, writer: writerId, at: new Date().toISOString() } }));
+      ...(kind === 'C見込み' && hope ? { hope } : {}), memo, writer: writerId, at: new Date().toISOString() } }));
     lsSet('yame-rec-staff', staff);
     $('#recForm').hidden = true;
     toast(kinds.length > 1 ? `${kinds.length}件 記録しました` : '記録しました', 2000);
@@ -3025,7 +3048,8 @@ $('#recExportGo').addEventListener('click', () => {
   const todo = r => {
     const d = r.date.replace(/-/g, '/');
     if (r.kind === '訪問') return '接点の「訪問」にチェック';
-    if (CP_KINDS.includes(r.kind)) return `接点の「${r.kind}」にチェック`;
+    if (CP_KINDS.includes(r.kind)) return `接点の「${r.kind}」にチェック` + (r.hope ? `・メモに「見込み：${r.hope}」` : '');
+    if (r.kind === '不要') return '接点の「今は要らない」にチェック';
     if (catSeasonOf(r)) { const s = catSeasonOf(r); return `接点の「お店誌${s}（旧 特選品${s}）」にチェック`; }
     if (r.kind === 'カレンダー') return '接点の「カレンダ」にチェック';
     if (r.status === '処分済み') return `元の所有を「廃棄」・廃棄日付 ${d}`;
@@ -3034,7 +3058,7 @@ $('#recExportGo').addEventListener('click', () => {
     return `所有を新規登録（${r.store === '他店' ? `他店・納品日 ${r.year ? r.year + '/01/01' : '製造年の1/1'}` : r.store || '自店か他店か確認'}）・廃棄日付 ${d}`;
   };
   const lines = [head.join(',')].concat(rows.map(r => [r.date.replace(/-/g, '/'), r.code, r.name, r.staff, r.kind,
-    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl, r.status ? '' : r.pcode, r.maker, r.model, r.year, (r.dlv || '').replace(/-/g, '/'), r.place, r.store,
+    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl || r.hope, r.status ? '' : r.pcode, r.maker, r.model, r.year, (r.dlv || '').replace(/-/g, '/'), r.place, r.store,
     r.origModel, r.origDate, r.kind === '所有確認' && (!r.status || r.status === '使用中') ? r.date.replace(/-/g, '/') : '',
     todo(r), r.memo, r.id, done.has(r.id) ? '済' : ''].map(q).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' });
@@ -3168,11 +3192,12 @@ const cpDue = (c, cp) => cp.cats.some(cat => { const a = currentAppliance(c, cat
 
 // one customer's activity in [from, to] (YYYY-MM-DD). 店クラウドVの接点と地図の記録は、同じ日・同じ種類なら1回と数える
 const SUM_ROWS = [
-  { k: '訪問', label: '訪問' }, { k: 'お店誌', label: 'お店誌' }, { k: 'カレンダー', label: 'カレンダー' }, { k: 'チラシ', label: '1 チラシ' }, { k: '推進', label: '2 推進' },
-  { k: '見込み', label: '3 見込み' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
+  { k: '訪問', label: '訪問' }, { k: 'お店誌', label: 'お店誌' }, { k: 'カレンダー', label: 'カレンダー' }, { k: 'チラシ', label: 'Aチラシ' }, { k: '推進', label: 'B推進' },
+  { k: '見込み', label: 'C見込み' }, { k: '不要', label: '今は要らない' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
 ];
 const SUM_STAFF = [...STAFF];
-const histKind = k => /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進/.test(k) ? '推進' : /チラシ/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
+const STAGE_ROW = new Set(['チラシ', '推進', '見込み', '不要']);
+const histKind = k => /不要|要らない/.test(k) ? '不要' : /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進/.test(k) ? '推進' : /チラシ/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
 const hasHist = () => [...customers.values()].some(c => c.hist && c.hist.length);
 const lastYear = d => addMonths(d, -12);
 function activityIn(from, to) {
@@ -3193,6 +3218,7 @@ function activityIn(from, to) {
     if (!customers.has(r.code)) continue;
     if (catSeasonOf(r)) push(r.code, 'お店誌', r.date, r.staff);
     else if (r.kind === 'カレンダー') push(r.code, 'カレンダー', r.date, r.staff);
+    else if (r.kind === '不要') push(r.code, '不要', r.date, r.staff);
     else if (r.kind === '所有確認') {
       const ex = !!(r.origModel || r.origDate);
       push(r.code, ex ? '所有確認' : '新規家電', r.date, r.staff, (r.appl === '熱源' ? 'IH' : r.appl) + (ex ? r.origModel || '' : r.model || ''));
@@ -3246,10 +3272,16 @@ function renderSummary() {
     const list = acts.filter(a => a.k === row.k);
     const houses = s => new Set(list.filter(a => s == null || a.staff === s).map(a => a.code)).size;
     const all = houses();
-    const py = prev ? new Set(prev.filter(a => a.k === row.k).map(a => a.code)).size : null;
-    return `<tr><th>${esc(row.label)}</th><td class="b">${all}</td><td>${pct(all, total)}</td><td>${py == null ? '–' : `${py}${diffTag(all, py)}`}</td><td>${list.length}</td>${SUM_STAFF.map(s => `<td>${houses(s) || ''}</td>`).join('')}</tr>`;
+    // 1・2・3は2026/10/27から意味が変わった（留守・面会・見込み）ので、去年とは比べない
+    const py = prev && !STAGE_ROW.has(row.k) ? new Set(prev.filter(a => a.k === row.k).map(a => a.code)).size : null;
+    return `<tr><th>${esc(CP_KINDS.includes(row.label) ? stageLabel(row.label) : row.label)}</th><td class="b">${all}</td><td>${pct(all, total)}</td><td>${py == null ? '–' : `${py}${diffTag(all, py)}`}</td><td>${list.length}</td>${SUM_STAFF.map(s => `<td>${houses(s) || ''}</td>`).join('')}</tr>`;
   }).join('');
   const anyContact = new Set(acts.map(a => a.code));
+  // 会えた率・見込み率: 1留守・2面会・3見込みの家の数から
+  const hs = k => new Set(acts.filter(a => a.k === k).map(a => a.code));
+  const hAway = hs('チラシ'), hMet = hs('推進'), hHope = hs('見込み');
+  const met = new Set([...hMet, ...hHope]), tried = new Set([...hAway, ...met]);   // 見込みの家は会えた家でもある
+  const rateHTML = `<p class="sum-rate">会えた率 <b>${pct(met.size, tried.size)}</b>（訪ねた${tried.size}軒のうち会えた${met.size}軒）　見込み率 <b>${pct(hHope.size, met.size)}</b>（会えた${met.size}軒のうち見込み${hHope.size}軒）</p>`;
   // 2) 販売（自店の納品）と、接点があった人・なかった人の買った割合
   const sales = salesIn(R.from, R.to);
   const byCat = new Map(); for (const s of sales) byCat.set(s.cat, (byCat.get(s.cat) || 0) + 1);
@@ -3258,13 +3290,14 @@ function renderSummary() {
   // 買う前（買った日まで）に接点があった人を「接点あり」とする
   const touched = new Set(acts.filter(a => !firstBuy.has(a.code) || a.day <= firstBuy.get(a.code)).map(a => a.code));
   const nT = touched.size, nN = total - nT;
+  const hopeBought = [...hHope].filter(c => buyers.has(c)).length;
   const bT = [...buyers].filter(c => touched.has(c)).length, bN = buyers.size - bT;
   const salesPrev = salesIn(P.from, P.to);
   const prevByCat = new Map(); for (const s of salesPrev) prevByCat.set(s.cat, (prevByCat.get(s.cat) || 0) + 1);
   const cats = [...new Set([...byCat.keys(), ...prevByCat.keys()])].sort((a, b) => (byCat.get(b) || 0) - (byCat.get(a) || 0));
   const salesCmp = cats.length ? `<div class="sumwrap"><table class="sumt"><tr><th>家電</th><th>今（台）<small>${fmtY(R.from)}〜${fmtY(upTo)}</small></th><th>去年の同じ期間<small>${fmtY(P.from)}〜${fmtY(P.to)}</small></th></tr>${cats.map(c => { const n = byCat.get(c) || 0, p = prevByCat.get(c) || 0; return `<tr><th>${esc(catName(c))}</th><td class="b">${n}</td><td>${p}${diffTag(n, p)}</td></tr>`; }).join('')}<tr><th>合計</th><td class="b">${sales.length}</td><td>${salesPrev.length}${diffTag(sales.length, salesPrev.length)}</td></tr></table></div>` : '';
   const salesHTML = salesCmp + (sales.length
-    ? `<p>今の期間に買ったお客様は ${buyers.size}軒です。</p>
+    ? `<p>今の期間に買ったお客様は ${buyers.size}軒です。見込みの家${hHope.size}軒のうち、買ったのは${hopeBought}軒（${pct(hopeBought, hHope.size)}）です。</p>
        <table class="sumt"><tr><th></th><th>お客様</th><th>買った</th><th>買った割合</th></tr>
        <tr><th>接点あり</th><td>${nT}</td><td>${bT}</td><td class="b">${pct(bT, nT)}</td></tr>
        <tr><th>接点なし</th><td>${nN}</td><td>${bN}</td><td class="b">${pct(bN, nN)}</td></tr></table>`
@@ -3276,7 +3309,11 @@ function renderSummary() {
     const due = [...customers.values()].filter(c => cpDue(c, cp));
     const seedActs = activityIn(seedFrom(cp), today < cp.to ? today : cp.to);
     const met = new Set(seedActs.filter(a => a.k !== '新規家電').map(a => a.code));
-    const hope = new Set(seedActs.filter(a => a.k === '見込み').map(a => a.code));
+    // 見込みの家電が記録されていれば、そのCPの家電の見込みだけを数える（家電のない見込みは今までどおり数える）
+    const hopeCats = new Map();
+    for (const r of computeRecords().recs.values()) if (r.kind === 'C見込み' && r.hope && r.date >= seedFrom(cp) && r.date <= today)
+      (hopeCats.get(r.code) || hopeCats.set(r.code, new Set()).get(r.code)).add(r.hope === '熱源' ? 'IH' : r.hope);
+    const hope = new Set(seedActs.filter(a => a.k === '見込み' && (!hopeCats.has(a.code) || cp.cats.some(x => hopeCats.get(a.code).has(x)))).map(a => a.code));
     const dueMet = due.filter(c => met.has(c.code)).length, dueHope = due.filter(c => hope.has(c.code)).length;
     const sold = salesIn(cp.from, cp.to, cp.cats);
     const w = due.length ? Math.round(dueMet / due.length * 100) : 0;
@@ -3289,6 +3326,8 @@ function renderSummary() {
     <p class="sum-range">${esc(R.label)}：${fmt(R.from)}〜${fmt(R.to)}　地図のお客様 ${total.toLocaleString()}軒</p>
     <h4>活動（軒数）</h4>
     <div class="sumwrap"><table class="sumt">${head}${rows}</table></div>
+    ${rateHTML}
+    ${R.from < STAGE_SINCE ? `<p class="sum-note">1・2・3は${fmt(STAGE_SINCE)}から「留守・面会・見込み」の意味です。それより前の分は「チラシ・推進・見込み」の記録なので、会えた率などは${fmt(STAGE_SINCE)}以降の期間で見てください。</p>` : ''}
     <p class="sum-note">何かしら接点があったお客様：<b>${anyContact.size}</b>軒（${pct(anyContact.size, total)}）。店クラウドVの接点と、この地図の記録を合わせて数えています（同じ日・同じ種類は1回）。</p>
     <h4>販売（自店で納品した家電）</h4>
     ${salesHTML}
