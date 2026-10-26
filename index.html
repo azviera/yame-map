@@ -749,6 +749,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 @keyframes todayGlow{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.2);opacity:.55}}
 @media (prefers-reduced-motion:reduce){.today-mark i{animation:none}}
 .lab-wrap.dim{opacity:.3}
+/* 📅: 押すと日付を選ぶ画面（見えない日付の欄をボタンいっぱいに重ねる） */
+#dayBtn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding-inline:8px;cursor:pointer;overflow:hidden}
+#dayBtn input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+#dayBtn.on{background:#ff9800;border-color:#ff9800}
+#todayBox .dnav{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+#todayBox .dnav:disabled{opacity:.35;cursor:default}
 #todayBox{position:absolute;top:10px;right:10px;z-index:850;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:calc(100% - 190px);justify-content:flex-end;padding:5px 8px;font-size:12px;
   background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
 #todayBox[hidden]{display:none}
@@ -874,6 +880,7 @@ details.more .row{margin-top:6px}
   #search:placeholder-shown{padding-right:8px;padding-left:10px}   /* 空のときは×が出ないので、案内の文字を広く */
   #openPanel{order:1;padding-inline:10px;flex:none}
   #todayBtn{order:1;padding-inline:8px;flex:none}
+  #dayBtn{order:1;flex:none;padding-inline:6px}
   #openPanel{display:inline-block}
   #loadTop{display:none}
   #panel{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:82%;border-right:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
@@ -910,6 +917,7 @@ details.more .row{margin-top:6px}
       <div id="hits" hidden><ul id="list"></ul><div class="more" id="listMore"></div></div>
     </div>
     <button class="btn" id="todayBtn" type="button" aria-pressed="false" title="今日つけられた記録（全員分）の場所を光らせます"><span class="ic" aria-hidden="true">◉</span><span class="tx">今日の動き</span><b id="todayN"></b></button>
+    <label class="btn" id="dayBtn" title="日にちを選んで、その日の動きを見る"><span aria-hidden="true">📅</span><input type="date" id="dayPick" aria-label="動きを見る日"></label>
     <button class="btn" id="openPanel" type="button">メニュー</button>
   </header>
 
@@ -2557,9 +2565,16 @@ function recRedraw() { applyRecords(); refresh(); if (selected) select(selected,
 const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '所有確認': '所' } };
 const todayTag = k => TODAY_UI.mark[k] || TODAY_UI.mark[k.replace(/(春|夏|秋|冬)$/, '')] || k.slice(0, 1);
 let todayOn = false, todayCodes = new Set();
+let todayDay = null;   // 📅で選んだ日（null＝今日）。開くといつも今日
 const todayLayer = L.layerGroup().addTo(map);
+const viewDay = () => todayDay || isoDay(new Date());
+const shiftDay = (d, n) => { const t = new Date(d + 'T00:00:00'); t.setDate(t.getDate() + n); return isoDay(t); };
 function renderToday() {
-  const day = isoDay(new Date()), by = new Map();
+  const day = viewDay(), by = new Map(), isToday = day === isoDay(new Date());
+  const label = isToday ? TODAY_UI.label : `${+day.slice(5, 7)}/${+day.slice(8, 10)}の動き`;
+  $('#todayBtn .tx').textContent = label;
+  $('#dayBtn').classList.toggle('on', todayOn && !isToday);
+  $('#dayPick').value = day; $('#dayPick').max = isoDay(new Date());
   for (const r of computeRecords().recs.values()) if (r.date === day && customers.has(r.code)) (by.get(r.code) || by.set(r.code, []).get(r.code)).push(r);
   todayCodes = by;
   $('#todayN').textContent = by.size ? ` ${by.size}` : '';
@@ -2576,11 +2591,18 @@ function renderToday() {
     L.marker([c.lat, c.lng], { interactive: false, keyboard: false, zIndexOffset: 2500,
       icon: L.divIcon({ className: 'today-mark', html: `<i style="--c:${col}"></i><b style="--c:${col}">${esc(tag)}</b>`, iconSize: [0, 0] }) }).addTo(todayLayer);
   }
-  box.innerHTML = by.size ? `<span>${TODAY_UI.label}</span>` + [...staffN].map(([st, codes]) =>
-    `<button type="button" data-today-staff="${esc(st)}" style="background:${staffColor(st)}">${esc(st)} ${codes.length}</button>`).join('') : `<span>${TODAY_UI.label}：今日の記録はまだありません</span>`;
+  // ＜ 前の日・＞ 次の日（今日より先へは進めない）・今日に戻る
+  const nav = `<button type="button" class="dnav" data-day="-1" aria-label="前の日">＜</button><span>${esc(label)}</span>` +
+    `<button type="button" class="dnav" data-day="1" aria-label="次の日"${isToday ? ' disabled' : ''}>＞</button>` +
+    (isToday ? '' : '<button type="button" class="dnav" data-day="0">今日</button>');
+  box.innerHTML = nav + (by.size ? [...staffN].map(([st, codes]) =>
+    `<button type="button" data-today-staff="${esc(st)}" style="background:${staffColor(st)}">${esc(st)} ${codes.length}</button>`).join('') : '<span>記録はありません</span>');
 }
-$('#todayBtn').addEventListener('click', () => { todayOn = !todayOn; renderToday(); refresh(); });
+const setViewDay = d => { const t = isoDay(new Date()); todayDay = !d || d >= t ? null : d; todayOn = true; renderToday(); refresh(); };
+$('#todayBtn').addEventListener('click', () => { todayOn = !todayOn; if (!todayOn) todayDay = null; renderToday(); refresh(); });
+$('#dayPick').addEventListener('change', e => setViewDay(e.target.value));
 $('#todayBox').addEventListener('click', e => {
+  const n = e.target.dataset.day; if (n != null) { setViewDay(+n ? shiftDay(viewDay(), +n) : null); return; }
   const st = e.target.dataset.todayStaff; if (st == null) return;
   const pts = [...todayCodes].filter(([, rs]) => rs.some(r => r.staff === st)).map(([code]) => customers.get(code)).filter(c => c && c.lat != null).map(c => [c.lat, c.lng]);
   if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.3), { maxZoom: ME_STAGE.near + STAGE0 });
