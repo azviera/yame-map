@@ -1427,17 +1427,19 @@ function renderSrcMods() {
   const tag = n => JSON_SRC_TAG[n] || srcTag(n);
   const names = Object.keys(mods).sort((a, b) => srcRank(a) - srcRank(b) || a.localeCompare(b, 'ja'));
   const box = $('#srcMods');
-  box.hidden = !names.length;
-  if (!names.length) { box.innerHTML = ''; return; }
+  // 今の地図が何のデータか・サインインが切れていないかは、いつも出す（端末ごとに違って見えたときの手がかり）
+  const oldData = !isSample && sources.length && !srcMods[JSON_DATA];
+  const head = (odSignedOut ? '<span class="warn">サインインが切れているため、新しいデータを読み込めません。「その他」の「OneDriveから最新を読み込む」を押してください</span><br>' : '') +
+    (oldData ? `<span class="warn">${JSON_DATA} ではなく古いファイル（Excel）のデータです${savedAt ? `（${fmtMod(+new Date(savedAt))} に読み込み）` : ''}</span><br>` : '');
+  box.hidden = !names.length && !head;
+  if (!names.length) { box.innerHTML = head; return; }
   const last = Math.max(...names.map(n => mods[n]));
   const behind = names.filter(n => last - mods[n] > SRC_GAP);
   const old = behind.length === 1 ? `${esc(tag(behind[0]))}だけ ${fmtMod(mods[behind[0]])}`
     : behind.map(n => `${esc(tag(n))} ${fmtMod(mods[n])}`).join('・');
   const made = (baseKey ? `<br>座標：${fmtMod(jsonSrc[baseKey])}` : '') +
     (srcMods[JSON_DATA] && jsonSrc['作成日時'] ? `<br>地図用データ作成：${fmtMod(jsonSrc['作成日時'])}` : '');
-  // 予備（今までのExcel）で表示しているときだけ小さく知らせる
-  const fallback = !srcMods[JSON_DATA] ? `<span class="warn">${JSON_DATA} が読めないので古いファイルで表示しています</span><br>` : '';
-  box.innerHTML = fallback + (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) + made;
+  box.innerHTML = head + (behind.length ? `<span class="warn">⚠ ${old} のまま（ほかは ${fmtMod(last)}）</span>` : `元データ更新：${fmtMod(last)}`) + made;
 }
 // OneDrive has something newer than this device shows: orange button that asks to load it, and a dot on メニュー
 const OD_LABEL = { odBtn: 'OneDriveから最新を読み込む', viewBtn: '最新のお客様データを表示' };
@@ -1459,20 +1461,25 @@ function checkNewer(list) {
   srcNewer = !isSample && list.some(f => loaded.has(f.name) && base(f.name) && Date.parse(f.lastModifiedDateTime) > base(f.name) + 1000);
   renderSrcMods(); showNewer();
 }
-let newerAt = 0, autoLoading = false, autoFails = 0;
+let newerAt = 0, autoLoading = false, autoFails = 0, odSignedOut = false;
 // 開いたとき・画面に戻ったとき（多くて2分に1回）と、表示中は5分ごとの軽い確認（recPoll）で OneDrive を見て、
 // 新しいデータがあれば自動で読み込む。表示の位置・拡大・開いているカード・絞り込みはそのまま。
 // 記録をつける画面を開いている間は待つ。電波が悪いときは静かに今のデータのまま、次の機会にやり直す（3回続けて失敗したときだけオレンジで知らせる）
 async function checkNewerNow() {
-  if (backFromLogin || !odReady() || !navigator.onLine || !lsGet('yame-od-tok') || autoLoading) return;
+  if (backFromLogin || !odReady() || !navigator.onLine || autoLoading) return;
   if (Date.now() - newerAt < 120000) return;
   newerAt = Date.now();
   try {
-    const t = await odToken(); if (!t) return;   // never sends anyone to the sign-in page from here
+    const t = lsGet('yame-od-tok') ? await odToken() : null;   // never sends anyone to the sign-in page from here
+    const out = !t && sources.length > 0 && !isSample;
+    if (out !== odSignedOut) { odSignedOut = out; renderSrcMods(); }
+    if (!t) return;
     const list = await odFolderChildren(t);
     await odReadSettings(list);   // 黄色い✓の日付・お店誌の今の季節
     checkNewer(list);
-    if (!(srcNewer || !sources.length || isSample)) { autoFails = 0; return; }
+    // 端末に残っているのが古いファイル（Excel）のデータで、OneDriveに 地図用データ.json があるなら読み直す
+    const needJson = list.some(f => isJsonData(f.name)) && !srcMods[JSON_DATA];
+    if (!(srcNewer || needJson || !sources.length || isSample)) { autoFails = 0; return; }
     if (!$('#recForm').hidden) { newerAt = 0; return; }
     autoLoading = true;
     const got = await odLoadFiles(list.filter(isDataFile));
