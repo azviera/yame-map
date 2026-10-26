@@ -734,6 +734,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #filterBar{position:absolute;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:800;display:flex;gap:6px;align-items:center;overflow-x:auto;padding:5px 8px;
   background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);scrollbar-width:none;width:fit-content;max-width:calc(100% - 24px);font-size:12px}
 #filterBar[hidden]{display:none}
+details.more summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:4px 0}
+details.more[open] summary{margin-bottom:8px}
+details.more .row{margin-top:6px}
 #filterBar::-webkit-scrollbar{display:none}
 #filterBar .fbtn{flex:none;height:28px;border-radius:14px;padding:0 10px;font-weight:700;font-size:12px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
 #filterBar.off .fbtn{background:var(--surface-2);color:var(--ink);border-color:var(--line)}
@@ -906,11 +909,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
       <div id="recState" class="recstate"></div>
       <div id="recOthers" class="recstate"></div>
-      <div class="row"><button class="btn" id="recExport" type="button">記録を書き出す（CSV）</button></div>
-      <div id="recExportBox" hidden class="recstate">
-        <label><input type="checkbox" id="recOnlyNew" checked> 店クラウドVに未入力の分だけ</label>
-        <div class="row"><button class="btn primary" id="recExportGo" type="button">書き出す</button><button class="btn" id="recMarkDone" type="button" disabled>書き出した分を「入力済み」にする</button></div>
-      </div>
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
@@ -929,6 +927,16 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div class="row" style="margin-bottom:8px"><button class="btn" id="defaultF" type="button">初期の絞り込みに戻す（顧客ランクS・未設定を外す）</button></div>
       <div id="filters"></div>
     </div>
+    <!-- ふだんは使わないもの: 店クラウドVへは「V自動入力」が記録フォルダから直接入れる -->
+    <details class="sec more">
+      <summary>その他</summary>
+      <div class="recstate">記録を書き出す（CSV）は、自動入力が使えないときに手で入力するためと、確かめるためのものです。</div>
+      <div class="row"><button class="btn" id="recExport" type="button">記録を書き出す（CSV）</button></div>
+      <div id="recExportBox" hidden class="recstate">
+        <label><input type="checkbox" id="recOnlyNew" checked> 店クラウドVに未入力の分だけ</label>
+        <div class="row"><button class="btn primary" id="recExportGo" type="button">書き出す</button><button class="btn" id="recMarkDone" type="button" disabled>書き出した分を「入力済み」にする</button></div>
+      </div>
+    </details>
   </aside>
 
   <main id="mapwrap">
