@@ -926,6 +926,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     </div>
     <div class="sec">
       <h2>絞り込み <a id="resetF">すべて表示</a></h2>
+      <div class="row" style="margin-bottom:8px"><button class="btn" id="defaultF" type="button">初期の絞り込みに戻す（顧客ランクS・未設定を外す）</button></div>
       <div id="filters"></div>
     </div>
   </aside>
@@ -1687,7 +1688,15 @@ const storeMarker = L.marker([STORE.lat, STORE.lng], { zIndexOffset: 1000, title
 
 let dim = 'rfm';   // ピンの色分け: RFM by default, the last choice is remembered
 try { const d = localStorage.getItem('yame-dim'); if (d && DIMS[d]) dim = d; } catch {}
+// 絞り込みは端末ごとに覚えて、アプリを最新にしても残す。初めてと、「すべて表示」のあと開き直したときは
+// いつもの絞り込み（顧客ランクS・未設定を外す）から始める
 let hidden = {}; for (const k in DIMS) hidden[k] = new Set();
+try {
+  const h = JSON.parse(localStorage.getItem('yame-hidden') || 'null');
+  if (h) for (const k in h) if (hidden[k]) hidden[k] = new Set(h[k]);
+} catch {}
+if (!Object.values(hidden).some(s => s.size)) hidden.rank = new Set(['S', '未設定']);
+const saveHidden = () => { try { localStorage.setItem('yame-hidden', JSON.stringify(Object.fromEntries(Object.entries(hidden).map(([k, s]) => [k, [...s]])))); } catch {} };
 let query = '';
 let selected = null;
 
@@ -1881,6 +1890,7 @@ map.on('moveend', () => {
 
 // 絞り込みを一時的に止める（条件は残したまま全件を出す）
 let filtersOff = false;
+try { filtersOff = localStorage.getItem('yame-filters-off') === 'true'; } catch {}
 const filterActive = () => Object.keys(DIMS).some(k => hidden[k].size);
 function passes(c, except) {
   if (query && !c.search.includes(query)) return false;
@@ -1962,7 +1972,9 @@ document.addEventListener('change', e => {
 function renderFilterBar() {
   const bar = $('#filterBar'), on = filterActive();
   bar.hidden = !on; $('#mapwrap').classList.toggle('fb', on);
-  if (!on) { filtersOff = false; return; }
+  if (!on) filtersOff = false;
+  saveHidden(); try { localStorage.setItem('yame-filters-off', String(filtersOff)); } catch {}   // 絞り込みとその入・切は、アプリを最新にしても残す
+  if (!on) return;
   bar.classList.toggle('off', filtersOff);
   const tags = Object.keys(DIMS).filter(k => hidden[k].size).map(k => {
     const all = valuesFor(k).map(x => x.v), kept = all.filter(v => !hidden[k].has(v)), off = all.filter(v => hidden[k].has(v));
@@ -2153,6 +2165,7 @@ function setCheckSince(v, save) {
 // only the owner picks the date (saved to OneDrive for everyone); others see it read-only
 $('#checkSince').addEventListener('change', e => setCheckSince(e.target.value, odReady() && role === 'owner'));
 $('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
+$('#defaultF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); hidden.rank = new Set(['S', '未設定']); filtersOff = false; refresh(); });
 
 /* ---------- OneDrive: read the Excel files straight from the Googleマイマップ folder (Microsoft Graph, sign-in with PKCE) ---------- */
 const OD = {
