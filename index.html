@@ -3168,11 +3168,11 @@ const cpDue = (c, cp) => cp.cats.some(cat => { const a = currentAppliance(c, cat
 
 // one customer's activity in [from, to] (YYYY-MM-DD). 店クラウドVの接点と地図の記録は、同じ日・同じ種類なら1回と数える
 const SUM_ROWS = [
-  { k: '訪問', label: '訪問' }, { k: 'お店誌', label: 'お店誌' }, { k: 'チラシ', label: '1 チラシ' }, { k: '推進', label: '2 推進' },
+  { k: '訪問', label: '訪問' }, { k: 'お店誌', label: 'お店誌' }, { k: 'カレンダー', label: 'カレンダー' }, { k: 'チラシ', label: '1 チラシ' }, { k: '推進', label: '2 推進' },
   { k: '見込み', label: '3 見込み' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
 ];
 const SUM_STAFF = [...STAFF];
-const histKind = k => /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進/.test(k) ? '推進' : /チラシ/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : '';
+const histKind = k => /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進/.test(k) ? '推進' : /チラシ/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
 const hasHist = () => [...customers.values()].some(c => c.hist && c.hist.length);
 const lastYear = d => addMonths(d, -12);
 function activityIn(from, to) {
@@ -3192,6 +3192,7 @@ function activityIn(from, to) {
   for (const r of computeRecords().recs.values()) {
     if (!customers.has(r.code)) continue;
     if (catSeasonOf(r)) push(r.code, 'お店誌', r.date, r.staff);
+    else if (r.kind === 'カレンダー') push(r.code, 'カレンダー', r.date, r.staff);
     else if (r.kind === '所有確認') {
       const ex = !!(r.origModel || r.origDate);
       push(r.code, ex ? '所有確認' : '新規家電', r.date, r.staff, (r.appl === '熱源' ? 'IH' : r.appl) + (ex ? r.origModel || '' : r.model || ''));
@@ -3291,7 +3292,7 @@ function renderSummary() {
     <p class="sum-note">店クラウドVの所有データの納品日で数えています（地図で数えている家電だけ）。「接点あり」は買った日までにこの期間の接点があったお客様です。</p>
     <h4>キャンペーンの種まき</h4>
     ${cps.length ? `<div class="sumwrap"><table class="sumt cpt"><tr><th>キャンペーン</th><th>替え時の家</th><th>種まき後に会えた家</th><th>見込み</th><th>販売</th><th></th></tr>${cpRows}</table></div>
-    <p class="sum-note">替え時の家：対象の家電が案内の年数を過ぎている家。会えた家：CPの${SEED_MONTHS}か月前から、訪問・お店誌・チラシ・推進・見込み・所有確認のどれかがあった家。販売はCP期間に自店で納品した台数。</p>` : '<p>今、種まき中のキャンペーンはありません。</p>'}
+    <p class="sum-note">替え時の家：対象の家電が案内の年数を過ぎている家。会えた家：CPの${SEED_MONTHS}か月前から、訪問・お店誌・カレンダー・チラシ・推進・見込み・所有確認のどれかがあった家。販売はCP期間に自店で納品した台数。</p>` : '<p>今、種まき中のキャンペーンはありません。</p>'}
     <p class="sum-note">${hist ? '去年の数字は、期間を1年前にずらして、店クラウドVの去年の接点と納品日から数えています。今いるお客様だけが対象です。' : '去年の販売は納品日から出しています。去年の活動（訪問・チラシなど）は、店クラウドVの去年の接点が地図用データに入ると出ます。'}</p>`;
 }
 function openSummary() {
