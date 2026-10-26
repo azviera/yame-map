@@ -3236,9 +3236,12 @@ function renderSummary() {
   const R = sumRange(), total = customers.size;
   const acts = activityIn(R.from, R.to);
   const fmt = d => d.replace(/^\d{4}-0?(\d+)-0?(\d+)$/, '$1/$2');
+  const fmtY = d => d.replace(/^(\d{4})-0?(\d+)-0?(\d+)$/, '$1/$2/$3');
   // 1) 活動量
-  const hist = hasHist(), prev = hist ? activityIn(lastYear(R.from), lastYear(R.to)) : null;
-  const head = `<tr><th>活動</th><th>合計（軒）</th><th>お客様の%</th><th>去年（軒）</th><th>回数</th>${SUM_STAFF.map(s => `<th><span class="sdot" style="background:${staffColor(s)}"></span>${esc(s)}</th>`).join('')}</tr>`;
+  // 去年は、今年と同じ長さだけ数える（期間の途中なら「去年の今日まで」）
+  const upTo = R.to < today ? R.to : today, P = { from: lastYear(R.from), to: lastYear(upTo) };
+  const hist = hasHist(), prev = hist ? activityIn(P.from, P.to) : null;
+  const head = `<tr><th>活動</th><th>合計（軒）</th><th>お客様の%</th><th>去年（軒）<small>${fmtY(P.from)}〜${fmtY(P.to)}</small></th><th>回数</th>${SUM_STAFF.map(s => `<th><span class="sdot" style="background:${staffColor(s)}"></span>${esc(s)}</th>`).join('')}</tr>`;
   const rows = SUM_ROWS.map(row => {
     const list = acts.filter(a => a.k === row.k);
     const houses = s => new Set(list.filter(a => s == null || a.staff === s).map(a => a.code)).size;
@@ -3256,10 +3259,10 @@ function renderSummary() {
   const touched = new Set(acts.filter(a => !firstBuy.has(a.code) || a.day <= firstBuy.get(a.code)).map(a => a.code));
   const nT = touched.size, nN = total - nT;
   const bT = [...buyers].filter(c => touched.has(c)).length, bN = buyers.size - bT;
-  const salesPrev = salesIn(lastYear(R.from), lastYear(R.to));
+  const salesPrev = salesIn(P.from, P.to);
   const prevByCat = new Map(); for (const s of salesPrev) prevByCat.set(s.cat, (prevByCat.get(s.cat) || 0) + 1);
   const cats = [...new Set([...byCat.keys(), ...prevByCat.keys()])].sort((a, b) => (byCat.get(b) || 0) - (byCat.get(a) || 0));
-  const salesCmp = cats.length ? `<div class="sumwrap"><table class="sumt"><tr><th>家電</th><th>今（台）</th><th>去年の同じ期間</th></tr>${cats.map(c => { const n = byCat.get(c) || 0, p = prevByCat.get(c) || 0; return `<tr><th>${esc(catName(c))}</th><td class="b">${n}</td><td>${p}${diffTag(n, p)}</td></tr>`; }).join('')}<tr><th>合計</th><td class="b">${sales.length}</td><td>${salesPrev.length}${diffTag(sales.length, salesPrev.length)}</td></tr></table></div>` : '';
+  const salesCmp = cats.length ? `<div class="sumwrap"><table class="sumt"><tr><th>家電</th><th>今（台）<small>${fmtY(R.from)}〜${fmtY(upTo)}</small></th><th>去年の同じ期間<small>${fmtY(P.from)}〜${fmtY(P.to)}</small></th></tr>${cats.map(c => { const n = byCat.get(c) || 0, p = prevByCat.get(c) || 0; return `<tr><th>${esc(catName(c))}</th><td class="b">${n}</td><td>${p}${diffTag(n, p)}</td></tr>`; }).join('')}<tr><th>合計</th><td class="b">${sales.length}</td><td>${salesPrev.length}${diffTag(sales.length, salesPrev.length)}</td></tr></table></div>` : '';
   const salesHTML = salesCmp + (sales.length
     ? `<p>今の期間に買ったお客様は ${buyers.size}軒です。</p>
        <table class="sumt"><tr><th></th><th>お客様</th><th>買った</th><th>買った割合</th></tr>
@@ -3293,7 +3296,7 @@ function renderSummary() {
     <h4>キャンペーンの種まき</h4>
     ${cps.length ? `<div class="sumwrap"><table class="sumt cpt"><tr><th>キャンペーン</th><th>替え時の家</th><th>種まき後に会えた家</th><th>見込み</th><th>販売</th><th></th></tr>${cpRows}</table></div>
     <p class="sum-note">替え時の家：対象の家電が案内の年数を過ぎている家。会えた家：CPの${SEED_MONTHS}か月前から、訪問・お店誌・カレンダー・チラシ・推進・見込み・所有確認のどれかがあった家。販売はCP期間に自店で納品した台数。</p>` : '<p>今、種まき中のキャンペーンはありません。</p>'}
-    <p class="sum-note">${hist ? '去年の数字は、期間を1年前にずらして、店クラウドVの去年の接点と納品日から数えています。今いるお客様だけが対象です。' : '去年の販売は納品日から出しています。去年の活動（訪問・チラシなど）は、店クラウドVの去年の接点が地図用データに入ると出ます。'}</p>`;
+    <p class="sum-note">${hist ? '去年の数字は、期間を1年前にずらして（今年が期間の途中なら、去年も同じ日まで）、店クラウドVの去年の接点と納品日から数えています。今いるお客様だけが対象です。' : '去年の販売は納品日から出しています。去年の活動（訪問・チラシなど）は、店クラウドVの去年の接点が地図用データに入ると出ます。'}</p>`;
 }
 function openSummary() {
   const sel = $('#sumPeriod'), today = isoDay(new Date());
