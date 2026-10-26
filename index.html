@@ -2664,10 +2664,14 @@ async function recPoll() {
   finally { recPolling = false; }
 }
 // new records from someone else: a soft pulse on those customers for a few seconds, and one quiet line in the menu
+// 知らせるのは、アプリを開いてから（ここ30分以内も条件）ほかの人がつけた記録だけ。開く前の記録をまとめて受け取ったとき
+// （しばらく開いていなかった・サインインし直した・データを読み直した）は光らせない。一度にたくさん来たら輪は出さず件数だけ
+const APP_OPENED = Date.now();
 function recAnnounce(evs) {
-  const recs = evs.filter(e => e.op === 'put' && e.rec).map(e => e.rec);
+  const recs = evs.filter(e => e.op === 'put' && e.rec && e.writer !== writerId &&
+    Date.parse(e.ts || 0) >= APP_OPENED - 60000 && Date.now() - Date.parse(e.ts || 0) < 1800000).map(e => e.rec);
   if (!recs.length) return;
-  for (const r of recs) {
+  if (recs.length <= 3) for (const r of recs) {
     const c = customers.get(r.code); if (!c || c.lat == null) continue;
     const m = L.marker([c.lat, c.lng], { interactive: false, keyboard: false, zIndexOffset: 3000,
       icon: L.divIcon({ className: 'rec-pulse', html: '<i></i>', iconSize: [0, 0] }) }).addTo(map);
