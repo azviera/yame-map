@@ -1233,8 +1233,8 @@ function parseLatLng(row) {
 }
 function stageOf(kind) {
   if (/見込/.test(kind)) return '見込み';
-  if (/推進/.test(kind)) return '推進';
-  if (/チラシ/.test(kind)) return 'チラシ';
+  if (/推進|面会/.test(kind)) return '推進';   // 店クラウドVの欄名を A留守・B面会 に変えても同じ扱い
+  if (/チラシ|留守/.test(kind)) return 'チラシ';
   return 'その他';
 }
 const STAGE_RANK = { '見込み':4, '推進':3, 'チラシ':2, 'その他':1, 'チラシ等なし':0 };
@@ -3197,7 +3197,7 @@ const SUM_ROWS = [
 ];
 const SUM_STAFF = [...STAFF];
 const STAGE_ROW = new Set(['チラシ', '推進', '見込み', '不要']);
-const histKind = k => /不要|要らない/.test(k) ? '不要' : /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進/.test(k) ? '推進' : /チラシ/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
+const histKind = k => /不要|要らない/.test(k) ? '不要' : /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進|面会/.test(k) ? '推進' : /チラシ|留守/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
 const hasHist = () => [...customers.values()].some(c => c.hist && c.hist.length);
 const lastYear = d => addMonths(d, -12);
 function activityIn(from, to) {
