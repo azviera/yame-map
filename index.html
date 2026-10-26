@@ -738,6 +738,21 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #filterBar{position:absolute;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:800;display:flex;gap:6px;align-items:center;overflow-x:auto;padding:5px 8px;
   background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);scrollbar-width:none;width:fit-content;max-width:calc(100% - 24px);font-size:12px}
 #filterBar[hidden]{display:none}
+/* 今日の動き: 今日の記録の場所を担当者の色の輪でゆっくり光らせる。ほかは薄く */
+#todayBtn{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+#todayBtn .ic{color:#ff9800;font-size:15px;line-height:1}
+#todayBtn b{font-variant-numeric:tabular-nums}
+#todayBtn.on{background:#ff9800;border-color:#ff9800;color:#fff}#todayBtn.on .ic{color:#fff}
+@media (max-width:420px){#todayBtn .tx{display:none}}   /* 狭い画面は ◉ と件数だけ */
+.today-mark i{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:3px solid var(--c);box-shadow:0 0 0 2px rgba(255,255,255,.85),0 0 10px var(--c);animation:todayGlow 2.4s ease-in-out infinite;pointer-events:none}
+.today-mark b{position:absolute;left:12px;top:-26px;font-size:11px;line-height:16px;color:#fff;background:var(--c);padding:0 4px;border-radius:4px;white-space:nowrap;box-shadow:0 0 0 1px #fff;pointer-events:none}
+@keyframes todayGlow{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.2);opacity:.55}}
+@media (prefers-reduced-motion:reduce){.today-mark i{animation:none}}
+.lab-wrap.dim{opacity:.3}
+#todayBox{position:absolute;top:10px;right:10px;z-index:850;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:calc(100% - 190px);justify-content:flex-end;padding:5px 8px;font-size:12px;
+  background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+#todayBox[hidden]{display:none}
+#todayBox button{border:none;border-radius:10px;padding:2px 8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer}
 details.more summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:4px 0}
 details.more[open] summary{margin-bottom:8px}
 details.more .row{margin-top:6px}
@@ -858,6 +873,7 @@ details.more .row{margin-top:6px}
   #hits{right:auto;width:calc(100vw - 20px)}
   #search:placeholder-shown{padding-right:8px;padding-left:10px}   /* 空のときは×が出ないので、案内の文字を広く */
   #openPanel{order:1;padding-inline:10px;flex:none}
+  #todayBtn{order:1;padding-inline:8px;flex:none}
   #openPanel{display:inline-block}
   #loadTop{display:none}
   #panel{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:82%;border-right:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
@@ -893,6 +909,7 @@ details.more .row{margin-top:6px}
       <input id="search" type="search" placeholder="名前・電話番号の下4桁・顧客番号で探す" aria-label="顧客を探す" autocomplete="off"><button type="button" id="searchClear" aria-label="入力を消す" hidden>×</button>
       <div id="hits" hidden><ul id="list"></ul><div class="more" id="listMore"></div></div>
     </div>
+    <button class="btn" id="todayBtn" type="button" aria-pressed="false" title="今日つけられた記録（全員分）の場所を光らせます"><span class="ic" aria-hidden="true">◉</span><span class="tx">今日の動き</span><b id="todayN"></b></button>
     <button class="btn" id="openPanel" type="button">メニュー</button>
   </header>
 
@@ -949,6 +966,7 @@ details.more .row{margin-top:6px}
     </div>
     <div id="legend" aria-label="凡例（タップで表示・非表示）"></div>
     <div id="filterBar" hidden></div>
+    <div id="todayBox" hidden></div>
     <section id="card" hidden aria-live="polite"></section>
   </main>
 </div>
@@ -1086,7 +1104,7 @@ const dotStyle = (k, v) => isRing(k, v) ? RING_CSS : `background:${colorOf(k, v)
     const ctx = r._ctx, p = this._point, w = this.options.weight;
     ctx.beginPath(); ctx.arc(p.x, p.y, this._radius, 0, Math.PI * 2);
     if (ctx.setLineDash) ctx.setLineDash([]);   // the dashed km circles leave their dash on the shared canvas
-    ctx.globalAlpha = 1; ctx.lineWidth = w; ctx.strokeStyle = '#000'; ctx.stroke();
+    ctx.globalAlpha = this.options.opacity ?? 1; ctx.lineWidth = w; ctx.strokeStyle = '#000'; ctx.stroke();
     ctx.lineWidth = w / 2; ctx.strokeStyle = '#fff'; ctx.stroke();
   };
 }
@@ -1838,7 +1856,7 @@ function renderLabels() {
   for (const c of customers.values()) {
     if (c.lat == null || !passes(c) || !b.contains([c.lat, c.lng])) continue;
     if (++n > (full ? 800 : 3000)) break;
-    L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'lab-wrap', html: labelHTML(c, flags, !full), iconSize: [0, 0] }),
+    L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'lab-wrap' + (todayOn && !todayCodes.has(c.code) ? ' dim' : ''), html: labelHTML(c, flags, !full), iconSize: [0, 0] }),
       zIndexOffset: selected === c.code ? 2000 : c.rank === 'S' ? 500 : 0, keyboard: false })
       .on('click', ev => { L.DomEvent.stopPropagation(ev); select(pickLabel(ev.originalEvent, c.code), false); }).addTo(labelLayer);
   }
@@ -1948,8 +1966,9 @@ function styleFor(c) {
   const k = Math.max(0.45, dotScale());
   const ring = isRing(dim, c.vals[dim]), r = (sel ? 11 : 7) * k, w = sel ? 3 : 1.5;
   // the ring has the same outer size as the other dots (radius + half the edge); weight = its black edge, the white line is half of it
-  if (ring) { const rw = sel ? 4 : 2.4; return { radius: Math.max(2, r + w / 2 - rw / 2), weight: rw, ring, fillOpacity: 0, renderer }; }
-  return { radius: r, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95,
+  const op = todayOn && !todayCodes.has(c.code) ? 0.3 : 1;   // 今日の動きがONのとき、今日の記録がない人は薄く
+  if (ring) { const rw = sel ? 4 : 2.4; return { radius: Math.max(2, r + w / 2 - rw / 2), weight: rw, ring, fillOpacity: 0, opacity: op, renderer }; }
+  return { radius: r, fillColor: colorOf(dim, c.vals[dim]), fillOpacity: 0.95 * op, opacity: op,
     color: sel ? css('--ink') : css('--pin-stroke'), weight: w, ring, renderer };
 }
 function rebuild(fit) {
@@ -2527,11 +2546,45 @@ function applyRecords() {
     }
   }
   finalize();
+  renderToday();   // 今日の動き（記録が増えたらすぐ光る）
 }
 // 新しく見つけた家電で製造年（納品日）が空: 店クラウドVには入れずに保留。直すで製造年を入れるとふつうに戻る
 const recHold = r => r.kind === '所有確認' && !r.status && !r.origModel && !r.origDate && !r.dlv && !/^\d{4}$/.test(r.year || '');
 const HOLD_TAG = '<b class="holdtag">保留・製造年を確認</b>';
 function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
+/* 今日の動き: 今日（この端末の日付）の記録がある人を、記録した担当者の色の輪で光らせ続ける。押すたびにON/OFF（開くといつもOFF）。
+   ONの間は、今日の記録がない人は薄く。右上に担当者ごとの件数（押すとその人の今日の場所へ） */
+const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '所有確認': '家' } };
+const todayTag = k => TODAY_UI.mark[k] || TODAY_UI.mark[k.replace(/(春|夏|秋|冬)$/, '')] || k.slice(0, 1);
+let todayOn = false, todayCodes = new Set();
+const todayLayer = L.layerGroup().addTo(map);
+function renderToday() {
+  const day = isoDay(new Date()), by = new Map();
+  for (const r of computeRecords().recs.values()) if (r.date === day && customers.has(r.code)) (by.get(r.code) || by.set(r.code, []).get(r.code)).push(r);
+  todayCodes = by;
+  $('#todayN').textContent = by.size ? ` ${by.size}` : '';
+  const btn = $('#todayBtn'); btn.classList.toggle('on', todayOn); btn.setAttribute('aria-pressed', todayOn);
+  todayLayer.clearLayers();
+  const box = $('#todayBox'); box.hidden = !todayOn;
+  if (!todayOn) return;
+  const staffN = new Map();
+  for (const [code, rs] of by) {
+    const c = customers.get(code), last = rs[rs.length - 1];
+    for (const st of new Set(rs.map(r => r.staff))) staffN.set(st, (staffN.get(st) || []).concat(code));
+    if (c.lat == null) continue;
+    const col = staffColor(last.staff), tag = [...new Set(rs.map(r => todayTag(r.kind)))].join('');
+    L.marker([c.lat, c.lng], { interactive: false, keyboard: false, zIndexOffset: 2500,
+      icon: L.divIcon({ className: 'today-mark', html: `<i style="--c:${col}"></i><b style="--c:${col}">${esc(tag)}</b>`, iconSize: [0, 0] }) }).addTo(todayLayer);
+  }
+  box.innerHTML = by.size ? `<span>${TODAY_UI.label}</span>` + [...staffN].map(([st, codes]) =>
+    `<button type="button" data-today-staff="${esc(st)}" style="background:${staffColor(st)}">${esc(st)} ${codes.length}</button>`).join('') : `<span>${TODAY_UI.label}：今日の記録はまだありません</span>`;
+}
+$('#todayBtn').addEventListener('click', () => { todayOn = !todayOn; renderToday(); refresh(); });
+$('#todayBox').addEventListener('click', e => {
+  const st = e.target.dataset.todayStaff; if (st == null) return;
+  const pts = [...todayCodes].filter(([, rs]) => rs.some(r => r.staff === st)).map(([code]) => customers.get(code)).filter(c => c && c.lat != null).map(c => [c.lat, c.lng]);
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.3), { maxZoom: ME_STAGE.near + STAGE0 });
+});
 function recListHTML(code) {
   const { recs, done } = computeRecords();
   // 店クラウドVに入力済みの記録は一覧に出さない（データは記録フォルダに残る）
