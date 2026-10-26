@@ -933,6 +933,7 @@ details.more .row{margin-top:6px}
 .ph.seed{background:#8a6a2f}.ph.grow{background:#3f8a4f}.ph.harvest{background:#c58a12}.ph.done{background:#8a8f96}
 .bar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);margin-right:6px;vertical-align:middle;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent)}
+.df{margin-left:4px;font-size:11px;font-weight:700}.df.up{color:#1f8a4c}.df.dn{color:#c62828}
 </style>
 
 <div id="app">
@@ -1449,6 +1450,8 @@ function applyActivity(c, act) {
     c.keys.add(key); (isVisit ? c.visits : c.events).push({ date, staff, kind, custom: '' });
   } };
   add(act['チラシ'], false); add(act['訪問'], true);
+  // 「履歴」: 去年からの接点（活動集計で去年と比べるためだけに使う。地図の印には使わない）
+  if (Array.isArray(act['履歴'])) c.hist = act['履歴'].map(e => ({ day: String(e['日付'] || '').slice(0, 10).replace(/\//g, '-'), kind: String(e['種類'] || ''), staff: staffAlias(e['担当']) })).filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.day));
 }
 async function readFile(file) {
   const buf = await file.arrayBuffer();
@@ -3169,6 +3172,9 @@ const SUM_ROWS = [
   { k: '見込み', label: '3 見込み' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
 ];
 const SUM_STAFF = [...STAFF];
+const histKind = k => /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進/.test(k) ? '推進' : /チラシ/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : '';
+const hasHist = () => [...customers.values()].some(c => c.hist && c.hist.length);
+const lastYear = d => addMonths(d, -12);
 function activityIn(from, to) {
   const inR = d => d && d >= from && d <= to;
   const acts = [];   // { code, k, day, staff, key }
@@ -3176,6 +3182,7 @@ function activityIn(from, to) {
   for (const c of customers.values()) {
     for (const v of c.visits) push(c.code, '訪問', v.date ? isoDay(v.date) : '', v.staff);
     for (const e of c.events) { const s = stageOf(e.kind); if (s !== 'その他') push(c.code, s, e.date ? isoDay(e.date) : '', e.staff); }
+    for (const e of c.hist || []) { const k = histKind(e.kind); if (k) push(c.code, k, e.day, e.staff); }
     for (const [cat, list] of Object.entries(c.appl)) for (const a of list) {
       if (a.fromRec) continue;   // 地図で見つけた家電は記録の方で数える
       const d = a.checked ? isoDay(a.checked) : '';   // 店クラウドVの所有確認（廃棄日だけ入っている）
@@ -3209,6 +3216,7 @@ function salesIn(from, to, cats) {
   return out;
 }
 const pct = (n, d) => d ? `${Math.round(n / d * 1000) / 10}%` : '–';
+const diffTag = (now, before) => now === before ? '' : `<span class="df ${now > before ? 'up' : 'dn'}">${now > before ? '+' : ''}${now - before}</span>`;
 let sumPeriod = 'cat';
 function sumRange() {
   const t = isoDay(new Date());
@@ -3228,12 +3236,14 @@ function renderSummary() {
   const acts = activityIn(R.from, R.to);
   const fmt = d => d.replace(/^\d{4}-0?(\d+)-0?(\d+)$/, '$1/$2');
   // 1) 活動量
-  const head = `<tr><th>活動</th><th>合計（軒）</th><th>お客様の%</th><th>回数</th>${SUM_STAFF.map(s => `<th><span class="sdot" style="background:${staffColor(s)}"></span>${esc(s)}</th>`).join('')}</tr>`;
+  const hist = hasHist(), prev = hist ? activityIn(lastYear(R.from), lastYear(R.to)) : null;
+  const head = `<tr><th>活動</th><th>合計（軒）</th><th>お客様の%</th><th>去年（軒）</th><th>回数</th>${SUM_STAFF.map(s => `<th><span class="sdot" style="background:${staffColor(s)}"></span>${esc(s)}</th>`).join('')}</tr>`;
   const rows = SUM_ROWS.map(row => {
     const list = acts.filter(a => a.k === row.k);
     const houses = s => new Set(list.filter(a => s == null || a.staff === s).map(a => a.code)).size;
     const all = houses();
-    return `<tr><th>${esc(row.label)}</th><td class="b">${all}</td><td>${pct(all, total)}</td><td>${list.length}</td>${SUM_STAFF.map(s => `<td>${houses(s) || ''}</td>`).join('')}</tr>`;
+    const py = prev ? new Set(prev.filter(a => a.k === row.k).map(a => a.code)).size : null;
+    return `<tr><th>${esc(row.label)}</th><td class="b">${all}</td><td>${pct(all, total)}</td><td>${py == null ? '–' : `${py}${diffTag(all, py)}`}</td><td>${list.length}</td>${SUM_STAFF.map(s => `<td>${houses(s) || ''}</td>`).join('')}</tr>`;
   }).join('');
   const anyContact = new Set(acts.map(a => a.code));
   // 2) 販売（自店の納品）と、接点があった人・なかった人の買った割合
@@ -3245,12 +3255,16 @@ function renderSummary() {
   const touched = new Set(acts.filter(a => !firstBuy.has(a.code) || a.day <= firstBuy.get(a.code)).map(a => a.code));
   const nT = touched.size, nN = total - nT;
   const bT = [...buyers].filter(c => touched.has(c)).length, bN = buyers.size - bT;
-  const salesHTML = sales.length
-    ? `<p>${[...byCat].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${esc(catName(c))} <b>${n}</b>台`).join('・')}（${buyers.size}軒）</p>
+  const salesPrev = salesIn(lastYear(R.from), lastYear(R.to));
+  const prevByCat = new Map(); for (const s of salesPrev) prevByCat.set(s.cat, (prevByCat.get(s.cat) || 0) + 1);
+  const cats = [...new Set([...byCat.keys(), ...prevByCat.keys()])].sort((a, b) => (byCat.get(b) || 0) - (byCat.get(a) || 0));
+  const salesCmp = cats.length ? `<div class="sumwrap"><table class="sumt"><tr><th>家電</th><th>今（台）</th><th>去年の同じ期間</th></tr>${cats.map(c => { const n = byCat.get(c) || 0, p = prevByCat.get(c) || 0; return `<tr><th>${esc(catName(c))}</th><td class="b">${n}</td><td>${p}${diffTag(n, p)}</td></tr>`; }).join('')}<tr><th>合計</th><td class="b">${sales.length}</td><td>${salesPrev.length}${diffTag(sales.length, salesPrev.length)}</td></tr></table></div>` : '';
+  const salesHTML = salesCmp + (sales.length
+    ? `<p>今の期間に買ったお客様は ${buyers.size}軒です。</p>
        <table class="sumt"><tr><th></th><th>お客様</th><th>買った</th><th>買った割合</th></tr>
        <tr><th>接点あり</th><td>${nT}</td><td>${bT}</td><td class="b">${pct(bT, nT)}</td></tr>
        <tr><th>接点なし</th><td>${nN}</td><td>${bN}</td><td class="b">${pct(bN, nN)}</td></tr></table>`
-    : '<p>この期間に自店で納品した家電はまだありません。</p>';
+    : '<p>この期間に自店で納品した家電はまだありません。</p>');
   // 3) キャンペーンの種まきの進み具合（今、種まき〜刈り取りのもの。終わって1か月以内も出す）
   const cps = CAMPAIGNS.map((cp, i) => ({ cp, i, ph: cpPhase(cp, today) }))
     .filter(x => x.ph !== 'これから' && !(x.ph === '終了' && addMonths(x.cp.to, 1) < today));
@@ -3278,7 +3292,7 @@ function renderSummary() {
     <h4>キャンペーンの種まき</h4>
     ${cps.length ? `<div class="sumwrap"><table class="sumt cpt"><tr><th>キャンペーン</th><th>替え時の家</th><th>種まき後に会えた家</th><th>見込み</th><th>販売</th><th></th></tr>${cpRows}</table></div>
     <p class="sum-note">替え時の家：対象の家電が案内の年数を過ぎている家。会えた家：CPの${SEED_MONTHS}か月前から、訪問・お店誌・チラシ・推進・見込み・所有確認のどれかがあった家。販売はCP期間に自店で納品した台数。</p>` : '<p>今、種まき中のキャンペーンはありません。</p>'}
-    <p class="sum-note">去年との比べ方は、店クラウドVの去年の接点をデータに入れてから出せるようにします。</p>`;
+    <p class="sum-note">${hist ? '去年の数字は、期間を1年前にずらして、店クラウドVの去年の接点と納品日から数えています。今いるお客様だけが対象です。' : '去年の販売は納品日から出しています。去年の活動（訪問・チラシなど）は、店クラウドVの去年の接点が地図用データに入ると出ます。'}</p>`;
 }
 function openSummary() {
   const sel = $('#sumPeriod'), today = isoDay(new Date());
