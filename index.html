@@ -680,7 +680,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .datepick.ro{border-style:dashed;cursor:default}
 .datepick.ro span[aria-hidden]{display:none}
 .datepick.ro input{display:none}
-#dim{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
 .btn{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--surface-2)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -902,7 +901,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
-      <div class="widesel"><label for="dim">ピンの丸の色分け</label><select id="dim"></select></div>
       <div class="widesel"><span>広域で出すアイコン（引いた地図・1〜11段階）</span>
         <button type="button" class="iconpick" id="widePick"></button></div>
       <div class="widesel"><span>中域で出すアイコン（12〜14段階）</span>
@@ -1893,7 +1891,7 @@ function rebuild(fit) {
     markers.set(c.code, m);
   }
   selected = null; $('#card').hidden = true;
-  renderDataState(); renderDimSelect(); renderLogoToggles(); refresh();
+  renderDataState(); renderLogoToggles(); refresh();
   if (fit) fitAll();
 }
 function refresh() {
@@ -1930,27 +1928,22 @@ function chipHTML(k, v, n) {
   return `<button type="button" class="chip${off ? ' off' : ''}" data-k="${k}" data-v="${esc(v)}" aria-pressed="${!off}">
     <span class="dot${isRing(k, v) ? ' ring' : ''}" style="${dotStyle(k, v)}"></span>${esc(v)}<span class="n">${n}</span></button>`;
 }
-// 下の軒数バー: 数を見るためのもの。左の項目名を押すと、ほかの項目の軒数に切り替わる（地図の印は変わらない）。
+// 下の軒数バー: 左の項目名で選んだ項目（最近接点者・顧客ランクなど）が、そのままピンの丸の色分けになる（1つの設定）。
 // 各ボタンを押すと、今までどおりその人たちを地図に出す・隠す（絞り込み）
-let legendDim = dim;
-try { const l = localStorage.getItem('yame-legend'); if (l && DIMS[l]) legendDim = l; } catch {}
 function renderLegend() {
-  $('#legend').innerHTML = `<select class="lt" id="legendSel" aria-label="軒数を見る項目" title="押すと、ほかの項目の軒数に切り替わります">${
-    Object.keys(DIMS).map(k => `<option value="${k}"${k === legendDim ? ' selected' : ''}>${esc(DIMS[k].label)}</option>`).join('')}</select>` +
-    valuesFor(legendDim).map(x => chipHTML(legendDim, x.v, x.n)).join('');
+  $('#legend').innerHTML = `<select class="lt" id="legendSel" aria-label="ピンの丸の色分けと軒数の項目" title="押すと、色分けと軒数の項目が切り替わります">${
+    Object.keys(DIMS).map(k => `<option value="${k}"${k === dim ? ' selected' : ''}>${esc(DIMS[k].label)}</option>`).join('')}</select>` +
+    valuesFor(dim).map(x => chipHTML(dim, x.v, x.n)).join('');
 }
 document.addEventListener('change', e => {
   if (e.target.id !== 'legendSel') return;
-  legendDim = e.target.value;
-  try { localStorage.setItem('yame-legend', legendDim); } catch {}
-  renderLegend();
+  dim = e.target.value;
+  try { localStorage.setItem('yame-dim', dim); } catch {}
+  refresh(); if (selected) select(selected, false);
 });
 function renderFilters() {
   $('#filters').innerHTML = Object.keys(DIMS).map(k =>
     `<div class="fgroup"><div class="t">${esc(DIMS[k].label)}</div><div class="chips">${valuesFor(k).map(x => chipHTML(k, x.v, x.n)).join('')}</div></div>`).join('');
-}
-function renderDimSelect() {
-  $('#dim').innerHTML = Object.keys(DIMS).map(k => `<option value="${k}"${k === dim ? ' selected' : ''}>${esc(DIMS[k].label)}</option>`).join('');
 }
 // customer search: name (spaces ignored), 顧客番号, or the last 4+ digits of a phone number; picking one opens its card on the map
 function renderList() {
@@ -2094,7 +2087,6 @@ $('#search').addEventListener('focus', renderList);
 // スマホでは検索窓が狭いので、短い案内に
 { const mq = matchMedia('(max-width:860px)'), setPh = () => { $('#search').placeholder = mq.matches ? '名前・番号で探す' : '名前・電話番号の下4桁・顧客番号で探す'; };
   setPh(); mq.addEventListener?.('change', setPh); }
-$('#dim').addEventListener('change', e => { dim = e.target.value; try { localStorage.setItem('yame-dim', dim); } catch {} refresh(); if (selected) select(selected, false); });
 $('#search').addEventListener('input', renderList);
 // 文字が入っているときだけ右に×を出し、押すと一気に消す（そのまま次の名前を打てる）
 const syncClear = () => { $('#searchClear').hidden = !$('#search').value; };
