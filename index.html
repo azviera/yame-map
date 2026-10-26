@@ -659,6 +659,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #rfKind label[hidden]{display:none}
 #rfKindHint{font-size:12px;color:var(--muted,#666);margin-top:-4px}
 #recForm .seg label.cur{border-color:var(--accent);font-weight:700}   /* 今配っている季節のお店誌 */
+/* カードの「お店誌 春 夏 秋 冬 カレンダー」: 小さめのボタンを1行に（狭い画面では折り返す） */
+.catrow{align-items:center;flex-wrap:wrap}
+.catrow .lt{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
+.catrow .btn.sm{padding:6px 10px;min-width:40px}
+.catrow .btn.cur{border:2px solid var(--accent);font-weight:700}
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
@@ -2106,7 +2111,8 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
       <div class="blk recblk"><h3>記録をつける</h3>
-        <div class="row"><button class="btn" type="button" data-rec="${CAT_KIND(CATALOG.current)}">お店誌（${CATALOG.current}）を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
+        <div class="row catrow"><span class="lt">お店誌</span>${CATALOG.seasons.map(s => `<button class="btn sm${s === CATALOG.current ? ' cur' : ''}" type="button" data-rec="${CAT_KIND(s)}">${s}</button>`).join('')}<button class="btn sm" type="button" data-rec="カレンダー">カレンダー</button></div>
+        <div class="row"><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
         <div class="row"><button class="btn" type="button" data-rec="Aチラシ">1 チラシ</button><button class="btn" type="button" data-rec="B推進">2 推進</button><button class="btn" type="button" data-rec="C見込み">3 見込み</button></div>
         ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
