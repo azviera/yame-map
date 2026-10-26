@@ -2554,7 +2554,7 @@ const HOLD_TAG = '<b class="holdtag">保留・製造年を確認</b>';
 function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
 /* 今日の動き: 今日（この端末の日付）の記録がある人を、記録した担当者の色の輪で光らせ続ける。押すたびにON/OFF（開くといつもOFF）。
    ONの間は、今日の記録がない人は薄く。右上に担当者ごとの件数（押すとその人の今日の場所へ） */
-const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '所有確認': '家' } };
+const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '所有確認': '所' } };
 const todayTag = k => TODAY_UI.mark[k] || TODAY_UI.mark[k.replace(/(春|夏|秋|冬)$/, '')] || k.slice(0, 1);
 let todayOn = false, todayCodes = new Set();
 const todayLayer = L.layerGroup().addTo(map);
