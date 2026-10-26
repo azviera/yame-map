@@ -907,6 +907,32 @@ details.more .row{margin-top:6px}
   #searchWrap{order:0;flex:1 1 160px}
   #search{height:34px}
 }
+/* 活動集計 */
+#sumSheet{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+#sumSheet[hidden]{display:none}
+#sumSheet .ss{background:var(--surface);color:var(--ink);width:min(860px,100%);max-height:92%;overflow-y:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px}
+@media (min-width:861px){#sumSheet{align-items:center}#sumSheet .ss{border-radius:16px}}
+#sumSheet h3{margin:0;font-size:17px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+#sumSheet h4{margin:8px 0 0;font-size:14px}
+#sumSheet p{margin:0}
+#sumSheet select,#sumSheet input{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);padding:0 8px;font-size:15px}
+.sum-pick{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sum-range{font-weight:700}
+.sum-note{color:var(--muted);font-size:12px}
+.sumwrap{overflow-x:auto}
+.sumt{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px;min-width:100%}
+.sumt th,.sumt td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.sumt th:first-child{text-align:left}
+.sumt tr:first-child th{font-size:12px;color:var(--muted);font-weight:700}
+.sumt td.b{font-weight:700}
+.sumt small{display:block;color:var(--muted);font-weight:400;font-size:11px}
+.sumt .btn{height:30px;font-size:12px;padding:0 8px}
+.sdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.cpt th:first-child{white-space:normal;min-width:9em}
+.ph{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;color:#fff}
+.ph.seed{background:#8a6a2f}.ph.grow{background:#3f8a4f}.ph.harvest{background:#c58a12}.ph.done{background:#8a8f96}
+.bar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);margin-right:6px;vertical-align:middle;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
 </style>
 
 <div id="app">
@@ -925,6 +951,7 @@ details.more .row{margin-top:6px}
     <div id="panelHead"><b>検索・絞り込み</b><button class="btn" id="closePanel" type="button">閉じる</button></div>
     <div class="sec">
       <div class="count">地図に表示中 <b id="shown">0</b> / <span id="total">0</span> 件</div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="sumBtn" type="button">📊 活動集計（訪問・見込み・販売）</button></div>
     </div>
     <div class="sec datafile">
       <h2>データ <a id="reloadApp">アプリを最新にする ↻</a></h2>
@@ -984,6 +1011,12 @@ details.more .row{margin-top:6px}
   <div class="row"><button class="btn" id="psAll" type="button">すべてチェック</button><button class="btn" id="psNone" type="button">すべて外す</button></div>
   <div class="pslist" id="psList"></div>
   <div class="acts"><button class="btn primary" id="psOk" type="button">決定</button></div>
+</div></div>
+<div id="sumSheet" hidden><div class="ss" role="dialog" aria-labelledby="sumTitle">
+  <h3 id="sumTitle">活動集計 <button class="btn" id="sumClose" type="button">閉じる</button></h3>
+  <div class="sum-pick"><label for="sumPeriod">期間</label><select id="sumPeriod"></select>
+    <span id="sumFree" hidden><input type="date" id="sumFrom" aria-label="はじめの日"> 〜 <input type="date" id="sumTo" aria-label="おわりの日"></span></div>
+  <div id="sumBody"></div>
 </div></div>
 <div id="recForm" hidden>
   <form autocomplete="off">
@@ -1981,10 +2014,14 @@ map.on('moveend', () => {
 
 // 絞り込みを一時的に止める（条件は残したまま全件を出す）
 let filtersOff = false;
+// 「キャンペーンの替え時だけ地図に出す」（集計から「地図で見る」を押したとき）
+let cpFocus = null;
+const cpFocusPasses = c => !cpFocus || cpDue(c, cpFocus);
 try { filtersOff = localStorage.getItem('yame-filters-off') === 'true'; } catch {}
-const filterActive = () => Object.keys(DIMS).some(k => hidden[k].size);
+const filterActive = () => !!cpFocus || Object.keys(DIMS).some(k => hidden[k].size);
 function passes(c, except) {
   if (query && !c.search.includes(query)) return false;
+  if (!filtersOff && !cpFocusPasses(c)) return false;
   if (!filtersOff) for (const k in DIMS) if (k !== except && hidden[k].has(c.vals[k])) return false;
   return true;
 }
@@ -2073,6 +2110,7 @@ function renderFilterBar() {
     const txt = !kept.length ? 'なし' : kept.length <= off.length ? kept.join('・') : off.join('・') + ' 以外';
     return `<span class="ftag">${esc(DIMS[k].label)}：${esc(txt)}</span>`;
   });
+  if (cpFocus) tags.unshift(`<span class="ftag">${esc(cpFocus.name)}の替え時 <button type="button" id="cpFocusOff" aria-label="キャンペーンの絞り込みをやめる">✕</button></span>`);
   const was = filtersOff; filtersOff = false;
   const n = [...customers.values()].filter(c => passes(c)).length;
   filtersOff = was;
@@ -2257,7 +2295,7 @@ function setCheckSince(v, save) {
 }
 // only the owner picks the date (saved to OneDrive for everyone); others see it read-only
 $('#checkSince').addEventListener('change', e => setCheckSince(e.target.value, odReady() && role === 'owner'));
-$('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); query = ''; $('#search').value = ''; refresh(); });
+$('#resetF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); cpFocus = null; query = ''; $('#search').value = ''; refresh(); });
 $('#defaultF').addEventListener('click', () => { for (const k in hidden) hidden[k].clear(); hidden.rank = new Set(['S', '未設定']); filtersOff = false; refresh(); });
 
 /* ---------- OneDrive: read the Excel files straight from the Googleマイマップ folder (Microsoft Graph, sign-in with PKCE) ---------- */
@@ -2422,6 +2460,7 @@ async function odReadSettings(list) {
     odSettings = s;
     setCheckSince(s.checkSince || '', false);
     applyCatalogSettings(s['お店誌']);
+    applyCampaignSettings(s['キャンペーン']);
   } catch {}
 }
 let odSettings = {};   // 地図の設定.json の中身（保存するときにほかの項目を消さないため）
@@ -3084,6 +3123,186 @@ $('#odBtn').addEventListener('click', () => {
   } catch (e) { toast(e.message, 8000); }
 })();
 // PC: hide / show the left panel to give the map the whole width
+/* ---------- 活動集計: 期間ごとの訪問・お店誌・チラシ・推進・見込み・所有確認の軒数と、自店の納品（販売）、キャンペーンの種まきの進み具合 ----------
+   キャンペーン表は「地図の設定.json」の "キャンペーン": [{"名前": "テレビCP・点検", "家電": ["テレビ"], "開始": "2026-09-01", "終了": "2026-11-30"}] で変えられる（ここは26年度ロードマップからの初めの値） */
+let CAMPAIGNS = [
+  { name: 'エアコン早期取付CP', cats: ['エアコン'], from: '2026-04-01', to: '2026-05-31' },
+  { name: 'キッチン空間CP', cats: ['IH', '食洗機'], from: '2026-05-01', to: '2026-06-30' },
+  { name: '冷蔵庫CP', cats: ['冷蔵庫'], from: '2026-05-01', to: '2026-07-31' },
+  { name: 'テレビCP・点検', cats: ['テレビ'], from: '2026-09-01', to: '2026-11-30' },
+  { name: '炊飯器・レンジ', cats: ['炊飯器', 'レンジ'], from: '2026-09-01', to: '2026-10-31' },
+  { name: 'オール電化CP', cats: ['給湯器', 'IH'], from: '2026-09-01', to: '2026-10-31' },
+  { name: 'エアコン ELX9300', cats: ['エアコン'], from: '2026-10-01', to: '2026-12-31' },
+  { name: '冷蔵庫CP（2回目）', cats: ['冷蔵庫'], from: '2026-11-01', to: '2026-12-31' },
+  { name: '掃除機CP', cats: ['掃除機'], from: '2026-11-01', to: '2026-12-31' },
+  { name: '洗濯機CP・点検', cats: ['洗濯機'], from: '2027-01-01', to: '2027-03-31' },
+  { name: 'エアコン点検', cats: ['エアコン'], from: '2027-01-01', to: '2027-03-31' },
+  { name: '食洗機CP', cats: ['食洗機'], from: '2027-01-01', to: '2027-03-31' },
+  { name: 'ドアホンCP', cats: ['ドアホン'], from: '2027-01-01', to: '2027-03-31' },
+];
+const SEED_MONTHS = 3;   // 種まきはCPの3か月前から（最後の1か月が「育て」）
+const catName = c => c === 'IH' ? '熱源' : c;
+function applyCampaignSettings(list) {
+  if (!Array.isArray(list)) return;
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  const ok = list.map(o => ({ name: String(o['名前'] || '').trim(), cats: (o['家電'] || []).map(x => x === '熱源' ? 'IH' : x).filter(x => TH[x]), from: o['開始'], to: o['終了'] }))
+    .filter(o => o.name && o.cats.length && day.test(o.from || '') && day.test(o.to || '') && o.from <= o.to);
+  if (ok.length) CAMPAIGNS = ok;
+}
+const addMonths = (d, n) => { const t = new Date(d + 'T00:00:00'); t.setMonth(t.getMonth() + n); return isoDay(t); };
+const seedFrom = cp => addMonths(cp.from, -SEED_MONTHS);
+function cpPhase(cp, today) {
+  if (today > cp.to) return '終了';
+  if (today >= cp.from) return '刈り取り';
+  if (today >= addMonths(cp.from, -1)) return '育て';
+  if (today >= seedFrom(cp)) return '種まき';
+  return 'これから';
+}
+const PHASE_CLS = { '種まき': 'seed', '育て': 'grow', '刈り取り': 'harvest', '終了': 'done', 'これから': 'later' };
+// 替え時: そのCPの家電のどれかが、案内の年数を過ぎている
+const cpDue = (c, cp) => cp.cats.some(cat => { const a = currentAppliance(c, cat); return a && isOver(cat, a); });
+
+
+// one customer's activity in [from, to] (YYYY-MM-DD). 店クラウドVの接点と地図の記録は、同じ日・同じ種類なら1回と数える
+const SUM_ROWS = [
+  { k: '訪問', label: '訪問' }, { k: 'お店誌', label: 'お店誌' }, { k: 'チラシ', label: '1 チラシ' }, { k: '推進', label: '2 推進' },
+  { k: '見込み', label: '3 見込み' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
+];
+const SUM_STAFF = [...STAFF];
+function activityIn(from, to) {
+  const inR = d => d && d >= from && d <= to;
+  const acts = [];   // { code, k, day, staff, key }
+  const push = (code, k, day, staff, extra = '') => { if (inR(day)) acts.push({ code, k, day, staff: staff || '', key: [code, k, day, extra].join('|') }); };
+  for (const c of customers.values()) {
+    for (const v of c.visits) push(c.code, '訪問', v.date ? isoDay(v.date) : '', v.staff);
+    for (const e of c.events) { const s = stageOf(e.kind); if (s !== 'その他') push(c.code, s, e.date ? isoDay(e.date) : '', e.staff); }
+    for (const [cat, list] of Object.entries(c.appl)) for (const a of list) {
+      if (a.fromRec) continue;   // 地図で見つけた家電は記録の方で数える
+      const d = a.checked ? isoDay(a.checked) : '';   // 店クラウドVの所有確認（廃棄日だけ入っている）
+      push(c.code, '所有確認', d, '', cat + (a.model || ''));
+    }
+  }
+  for (const r of computeRecords().recs.values()) {
+    if (!customers.has(r.code)) continue;
+    if (catSeasonOf(r)) push(r.code, 'お店誌', r.date, r.staff);
+    else if (r.kind === '所有確認') {
+      const ex = !!(r.origModel || r.origDate);
+      push(r.code, ex ? '所有確認' : '新規家電', r.date, r.staff, (r.appl === '熱源' ? 'IH' : r.appl) + (ex ? r.origModel || '' : r.model || ''));
+    }
+  }
+  // 同じものは1回（担当がわかる方を残す）
+  const uniq = new Map();
+  for (const a of acts) { const o = uniq.get(a.key); if (!o || (!o.staff && a.staff)) uniq.set(a.key, a); }
+  return [...uniq.values()];
+}
+// 自店で納品した家電（店クラウドVの所有データの納品日）＝ 販売
+function salesIn(from, to, cats) {
+  const out = [];
+  for (const c of customers.values()) for (const [cat, list] of Object.entries(c.appl)) {
+    if (cats && !cats.includes(cat)) continue;
+    for (const a of list) {
+      if (a.fromRec || !a.date || a.store === '他店') continue;
+      const d = isoDay(a.date);
+      if (d >= from && d <= to) out.push({ code: c.code, cat, day: d });
+    }
+  }
+  return out;
+}
+const pct = (n, d) => d ? `${Math.round(n / d * 1000) / 10}%` : '–';
+let sumPeriod = 'cat';
+function sumRange() {
+  const t = isoDay(new Date());
+  if (sumPeriod === 'cat') return { from: CATALOG.from, to: CATALOG.to, label: `お店誌${CATALOG.current}の期間` };
+  if (sumPeriod === 'month') return { from: t.slice(0, 8) + '01', to: t, label: '今月' };
+  if (sumPeriod === 'week') { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return { from: isoDay(d), to: t, label: '今週（月曜から）' }; }
+  if (sumPeriod === 'free') { const f = $('#sumFrom').value || t, to = $('#sumTo').value || t; return { from: f <= to ? f : to, to: f <= to ? to : f, label: '指定した期間' }; }
+  const cp = CAMPAIGNS[+sumPeriod.slice(3)];
+  return cp ? { from: seedFrom(cp), to: cp.to, label: `${cp.name}（種まきから）` } : { from: t, to: t, label: '' };
+}
+function renderSummary() {
+  const box = $('#sumBody');
+  if (!customers.size) { box.innerHTML = '<p class="sum-note">お客様データを読み込むと集計できます。</p>'; return; }
+  const today = isoDay(new Date());
+  $('#sumFree').hidden = sumPeriod !== 'free';
+  const R = sumRange(), total = customers.size;
+  const acts = activityIn(R.from, R.to);
+  const fmt = d => d.replace(/^\d{4}-0?(\d+)-0?(\d+)$/, '$1/$2');
+  // 1) 活動量
+  const head = `<tr><th>活動</th><th>合計（軒）</th><th>お客様の%</th><th>回数</th>${SUM_STAFF.map(s => `<th><span class="sdot" style="background:${staffColor(s)}"></span>${esc(s)}</th>`).join('')}</tr>`;
+  const rows = SUM_ROWS.map(row => {
+    const list = acts.filter(a => a.k === row.k);
+    const houses = s => new Set(list.filter(a => s == null || a.staff === s).map(a => a.code)).size;
+    const all = houses();
+    return `<tr><th>${esc(row.label)}</th><td class="b">${all}</td><td>${pct(all, total)}</td><td>${list.length}</td>${SUM_STAFF.map(s => `<td>${houses(s) || ''}</td>`).join('')}</tr>`;
+  }).join('');
+  const anyContact = new Set(acts.map(a => a.code));
+  // 2) 販売（自店の納品）と、接点があった人・なかった人の買った割合
+  const sales = salesIn(R.from, R.to);
+  const byCat = new Map(); for (const s of sales) byCat.set(s.cat, (byCat.get(s.cat) || 0) + 1);
+  const buyers = new Set(sales.map(s => s.code));
+  const firstBuy = new Map(); for (const s of sales) if (!firstBuy.has(s.code) || s.day < firstBuy.get(s.code)) firstBuy.set(s.code, s.day);
+  // 買う前（買った日まで）に接点があった人を「接点あり」とする
+  const touched = new Set(acts.filter(a => !firstBuy.has(a.code) || a.day <= firstBuy.get(a.code)).map(a => a.code));
+  const nT = touched.size, nN = total - nT;
+  const bT = [...buyers].filter(c => touched.has(c)).length, bN = buyers.size - bT;
+  const salesHTML = sales.length
+    ? `<p>${[...byCat].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${esc(catName(c))} <b>${n}</b>台`).join('・')}（${buyers.size}軒）</p>
+       <table class="sumt"><tr><th></th><th>お客様</th><th>買った</th><th>買った割合</th></tr>
+       <tr><th>接点あり</th><td>${nT}</td><td>${bT}</td><td class="b">${pct(bT, nT)}</td></tr>
+       <tr><th>接点なし</th><td>${nN}</td><td>${bN}</td><td class="b">${pct(bN, nN)}</td></tr></table>`
+    : '<p>この期間に自店で納品した家電はまだありません。</p>';
+  // 3) キャンペーンの種まきの進み具合（今、種まき〜刈り取りのもの。終わって1か月以内も出す）
+  const cps = CAMPAIGNS.map((cp, i) => ({ cp, i, ph: cpPhase(cp, today) }))
+    .filter(x => x.ph !== 'これから' && !(x.ph === '終了' && addMonths(x.cp.to, 1) < today));
+  const cpRows = cps.map(({ cp, i, ph }) => {
+    const due = [...customers.values()].filter(c => cpDue(c, cp));
+    const seedActs = activityIn(seedFrom(cp), today < cp.to ? today : cp.to);
+    const met = new Set(seedActs.filter(a => a.k !== '新規家電').map(a => a.code));
+    const hope = new Set(seedActs.filter(a => a.k === '見込み').map(a => a.code));
+    const dueMet = due.filter(c => met.has(c.code)).length, dueHope = due.filter(c => hope.has(c.code)).length;
+    const sold = salesIn(cp.from, cp.to, cp.cats);
+    const w = due.length ? Math.round(dueMet / due.length * 100) : 0;
+    return `<tr><th>${esc(cp.name)} <span class="ph ${PHASE_CLS[ph]}">${ph}</span><small>${cp.cats.map(c => esc(catName(c))).join('・')}　${fmt(cp.from)}〜${fmt(cp.to)}</small></th>
+      <td>${due.length}</td>
+      <td><div class="bar"><i style="width:${w}%"></i></div>${dueMet}（${pct(dueMet, due.length)}）</td><td>${dueHope}</td><td class="b">${sold.length}</td>
+      <td><button type="button" class="btn" data-cpfocus="${i}">地図で見る</button></td></tr>`;
+  }).join('');
+  box.innerHTML = `
+    <p class="sum-range">${esc(R.label)}：${fmt(R.from)}〜${fmt(R.to)}　地図のお客様 ${total.toLocaleString()}軒</p>
+    <h4>活動（軒数）</h4>
+    <div class="sumwrap"><table class="sumt">${head}${rows}</table></div>
+    <p class="sum-note">何かしら接点があったお客様：<b>${anyContact.size}</b>軒（${pct(anyContact.size, total)}）。店クラウドVの接点と、この地図の記録を合わせて数えています（同じ日・同じ種類は1回）。</p>
+    <h4>販売（自店で納品した家電）</h4>
+    ${salesHTML}
+    <p class="sum-note">店クラウドVの所有データの納品日で数えています（地図で数えている家電だけ）。「接点あり」は買った日までにこの期間の接点があったお客様です。</p>
+    <h4>キャンペーンの種まき</h4>
+    ${cps.length ? `<div class="sumwrap"><table class="sumt cpt"><tr><th>キャンペーン</th><th>替え時の家</th><th>種まき後に会えた家</th><th>見込み</th><th>販売</th><th></th></tr>${cpRows}</table></div>
+    <p class="sum-note">替え時の家：対象の家電が案内の年数を過ぎている家。会えた家：CPの${SEED_MONTHS}か月前から、訪問・お店誌・チラシ・推進・見込み・所有確認のどれかがあった家。販売はCP期間に自店で納品した台数。</p>` : '<p>今、種まき中のキャンペーンはありません。</p>'}
+    <p class="sum-note">去年との比べ方は、店クラウドVの去年の接点をデータに入れてから出せるようにします。</p>`;
+}
+function openSummary() {
+  const sel = $('#sumPeriod'), today = isoDay(new Date());
+  sel.innerHTML = opt('cat', `お店誌${CATALOG.current}の期間`) + opt('month', '今月') + opt('week', '今週') +
+    CAMPAIGNS.map((cp, i) => ({ cp, i })).filter(x => cpPhase(x.cp, today) !== 'これから' && addMonths(x.cp.to, 1) >= today)
+      .map(({ cp, i }) => opt('cp-' + i, cp.name)).join('') + opt('free', '期間を指定');
+  if (![...sel.options].some(o => o.value === sumPeriod)) sumPeriod = 'cat';
+  sel.value = sumPeriod;
+  $('#sumSheet').hidden = false;
+  renderSummary();
+}
+$('#sumBtn').addEventListener('click', openSummary);
+$('#sumClose').addEventListener('click', () => { $('#sumSheet').hidden = true; });
+$('#sumSheet').addEventListener('click', e => {
+  if (e.target.id === 'sumSheet') { $('#sumSheet').hidden = true; return; }
+  const i = e.target.dataset.cpfocus; if (i == null) return;
+  cpFocus = CAMPAIGNS[+i]; filtersOff = false;
+  $('#sumSheet').hidden = true;
+  refresh(); toast(`${cpFocus.name}の替え時の家だけを出しています。下の「絞り込み中」の ✕ で戻せます`, 5000);
+});
+$('#sumPeriod').addEventListener('change', e => { sumPeriod = e.target.value; renderSummary(); });
+for (const id of ['sumFrom', 'sumTo']) $('#' + id).addEventListener('change', renderSummary);
+document.addEventListener('click', e => { if (e.target.id === 'cpFocusOff') { cpFocus = null; refresh(); } });
+
 function setPanel(open) {
   $('#app').classList.toggle('nopanel', !open);
   $('#panelToggle').textContent = open ? '◀ 情報を隠す' : '▶ 情報を表示';
