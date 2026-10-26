@@ -904,8 +904,6 @@ details.more .row{margin-top:6px}
       <h2>データ <a id="reloadApp">アプリを最新にする ↻</a></h2>
       <div id="dataState"></div>
       <div id="srcMods" class="srcmods" hidden></div>
-      <div class="row"><button class="btn primary" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
-      <div id="odBox" hidden></div>
       <div class="row" id="viewRow" hidden><button class="btn primary" id="viewBtn" type="button">最新のお客様データを表示</button></div>
       <div id="recState" class="recstate"></div>
       <div id="recOthers" class="recstate"></div>
@@ -930,6 +928,9 @@ details.more .row{margin-top:6px}
     <!-- ふだんは使わないもの: 店クラウドVへは「V自動入力」が記録フォルダから直接入れる -->
     <details class="sec more">
       <summary>その他</summary>
+      <div class="recstate">新しいデータは自動で読み込みます。手でやり直したいときはこちら。</div>
+      <div class="row"><button class="btn" id="odBtn" type="button">OneDriveから最新を読み込む</button></div>
+      <div id="odBox" hidden></div>
       <div class="recstate">記録を書き出す（CSV）は、自動入力が使えないときに手で入力するためと、確かめるためのものです。</div>
       <div class="row"><button class="btn" id="recExport" type="button">記録を書き出す（CSV）</button></div>
       <div id="recExportBox" hidden class="recstate">
@@ -1435,13 +1436,15 @@ function renderSrcMods() {
 }
 // OneDrive has something newer than this device shows: orange button that asks to load it, and a dot on メニュー
 const OD_LABEL = { odBtn: 'OneDriveから最新を読み込む', viewBtn: '最新のお客様データを表示' };
+// 新しいデータは自動で読み込むので、ふだんは何も出さない。自動の読み込みが3回続けて失敗したときだけオレンジで知らせる
 function showNewer() {
+  const warn = srcNewer && typeof autoFails === 'number' && autoFails >= 3;
   for (const id in OD_LABEL) {
     const b = $('#' + id); if (b.disabled) continue;
-    b.classList.toggle('newdata', srcNewer);
-    b.textContent = srcNewer ? '新しいデータがあります ― 押して読み込む' : OD_LABEL[id];
+    b.classList.toggle('newdata', warn);
+    b.textContent = warn ? '新しいデータを読み込めていません ― 押して読み込む' : OD_LABEL[id];
   }
-  $('#openPanel').classList.toggle('newdata', srcNewer);
+  $('#openPanel').classList.toggle('newdata', warn);
 }
 // a listing of the OneDrive folder: is any loaded file newer there than what this device shows?
 // data saved before the file times were kept is compared with when it was loaded
@@ -1451,12 +1454,29 @@ function checkNewer(list) {
   srcNewer = !isSample && list.some(f => loaded.has(f.name) && base(f.name) && Date.parse(f.lastModifiedDateTime) > base(f.name) + 1000);
   renderSrcMods(); showNewer();
 }
-let newerAt = 0;
+let newerAt = 0, autoLoading = false, autoFails = 0;
+// 開いたとき・画面に戻ったとき（多くて2分に1回）と、表示中は5分ごとの軽い確認（recPoll）で OneDrive を見て、
+// 新しいデータがあれば自動で読み込む。表示の位置・拡大・開いているカード・絞り込みはそのまま。
+// 記録をつける画面を開いている間は待つ。電波が悪いときは静かに今のデータのまま、次の機会にやり直す（3回続けて失敗したときだけオレンジで知らせる）
 async function checkNewerNow() {
-  if (backFromLogin || !odReady() || !sources.length || isSample || !navigator.onLine) return;
-  if (Date.now() - newerAt < 600000) return;   // at most once every 10 minutes
+  if (backFromLogin || !odReady() || !navigator.onLine || !lsGet('yame-od-tok') || autoLoading) return;
+  if (Date.now() - newerAt < 120000) return;
   newerAt = Date.now();
-  try { const t = await odToken(); if (t) checkNewer(await odFolderChildren(t)); } catch {}
+  try {
+    const t = await odToken(); if (!t) return;   // never sends anyone to the sign-in page from here
+    const list = await odFolderChildren(t);
+    checkNewer(list);
+    if (!(srcNewer || !sources.length || isSample)) { autoFails = 0; return; }
+    if (!$('#recForm').hidden) { newerAt = 0; return; }
+    autoLoading = true;
+    const got = await odLoadFiles(list.filter(isDataFile));
+    if (!got.length) throw new Error('nothing');
+    if (!$('#recForm').hidden) { newerAt = 0; return; }
+    freshNext = true;
+    await importFiles(got, true);
+    autoFails = 0;
+    toast(`新しいデータを読み込みました${jsonSrc['作成日時'] ? ' ' + fmtMod(jsonSrc['作成日時']) : ''}`, 3500);
+  } catch { autoFails++; } finally { autoLoading = false; showNewer(); }
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkNewerNow(); });
 const odFile = async f => {
@@ -1465,8 +1485,10 @@ const odFile = async f => {
   return new File([await r.blob()], f.name, { lastModified: Date.parse(f.lastModifiedDateTime) || Date.now() });
 };
 
-async function importFiles(files) {
+// quiet: 自動の読み込み。表示の位置・拡大・開いているカードはそのまま、長いお知らせも出さない
+async function importFiles(files, quiet) {
   if (!files.length) return;
+  const keepSel = quiet ? selected : null;
   if (isSample || freshNext) { customers = new Map(); rHidden = new Map(); sources = []; srcMods = {}; jsonSrc = {}; isSample = false; }
   else for (const [code, c] of rHidden) customers.set(code, c);   // adding files: put the hidden ランクR people back so their rows merge
   freshNext = false; srcNewer = false;
@@ -1479,9 +1501,11 @@ async function importFiles(files) {
       if (!n) bad.push(f.name); else { rows += n; sources.push(`${f.name}（${n.toLocaleString()}行）`); srcMods[f.name] = f.lastModified; }
     } catch (e) { bad.push(`${f.name}：${e.message}`); }
   }
-  applyRecords(); savedAt = new Date(); rebuild(true); renderSrcMods(); showNewer();
+  applyRecords(); savedAt = new Date(); rebuild(!quiet); renderSrcMods(); showNewer();
+  if (keepSel && customers.has(keepSel)) select(keepSel, false, true);
   saveData();
   recLoad();
+  if (quiet) return;
   const noXY = [...customers.values()].filter(c => c.lat == null).length;
   let msg = `${files.length}ファイル・${rows.toLocaleString()}行を読み込み、${customers.size.toLocaleString()}人にまとめました。`;
   if (noXY) msg += ` 座標がない ${noXY}人は一覧のみに出ます。`;
@@ -2025,7 +2049,7 @@ function renderDataState() {
 }
 
 /* ---------- customer card ---------- */
-function select(code, pan) {
+function select(code, pan, stay) {   // stay: redraw the open card without moving the map
   selected = code;
   const c = customers.get(code); if (!c) return;
   refresh();
@@ -2087,7 +2111,7 @@ function select(code, pan) {
   $('#closeCard').onclick = closeCard;
   $('#panel').classList.remove('open');
   // keep the chosen pin visible beside (PC) or above (phone) the card
-  if (c.lat != null && (pan || innerWidth <= 860)) {
+  if (c.lat != null && !stay && (pan || innerWidth <= 860)) {
     // 検索で選んだ人へ移るときは、いつも現在地ボタンの「詳細」と同じ段階（15段階＝ズーム19。航空写真は写真のある所まで）
     const z = pan ? Math.min(map.getMaxZoom(), ME_STAGE.near + STAGE0) : map.getZoom();
     const off = innerWidth <= 860 ? L.point(0, $('#card').offsetHeight / 2) : L.point(190, 0);
@@ -2583,8 +2607,8 @@ async function recLoad() {
 }
 /* ほかの人の記録をほぼリアルタイムで: 画面に出ている間、1分ごとに「記録」フォルダの大きさと更新時刻だけを聞き（数百バイト）、
    変わっていたら変わったファイルだけ読む。念のため10分に1回は一覧も見る。画面を閉じている間は止め、戻ったらすぐ1回 */
-const REC_POLL = 60000, REC_FULL = 600000;
-let recSig = '', recFullAt = 0, recPollT = null, recPolling = false;
+const REC_POLL = 60000, REC_FULL = 600000, JSON_POLL = 300000;
+let recSig = '', recFullAt = 0, recPollT = null, recPolling = false, jsonAt = Date.now();
 async function recPoll() {
   clearTimeout(recPollT); recPollT = null;
   if (document.visibilityState !== 'visible') return;
@@ -2597,6 +2621,12 @@ async function recPoll() {
     const it = await graph(`${recBase()}?$select=size,lastModifiedDateTime`, t);
     const sig = `${it.size}|${it.lastModifiedDateTime}`;
     if (sig !== recSig || Date.now() - recFullAt > REC_FULL) { recSig = sig; recFullAt = Date.now(); await recLoad(); }
+    // 5分に1回、地図用データ.json の更新日時だけを聞く（数百バイト）。新しくなっていたら自動で読み込む
+    if (Date.now() - jsonAt > JSON_POLL) {
+      jsonAt = Date.now();
+      const j = await graph(`/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(JSON_DATA)}?$select=lastModifiedDateTime`, t);
+      if (!srcMods[JSON_DATA] || Date.parse(j.lastModifiedDateTime) > srcMods[JSON_DATA] + 1000) { newerAt = 0; checkNewerNow(); }
+    }
   } catch { /* no signal or a passing error: try again next time, quietly */ }
   finally { recPolling = false; }
 }
@@ -2901,7 +2931,7 @@ $('#odBtn').addEventListener('click', () => {
   const p = lsGet('yame-od-pkce'); lsSet('yame-od-pkce', null);
   if (q.has('error')) {
     const silent = lsGet('yame-od-pending') === 'silent';
-    if (silent && /login_required|interaction_required|consent_required/.test(q.get('error'))) { lsSet('yame-od-pending', null); toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」（または「OneDriveから最新を読み込む」）を押してサインインし直してください', 8000); return; }
+    if (silent && /login_required|interaction_required|consent_required/.test(q.get('error'))) { lsSet('yame-od-pending', null); toast('サインインの期限が切れました。「メニュー」の「最新のお客様データを表示」（または「その他」の「OneDriveから最新を読み込む」）を押してサインインし直してください', 8000); return; }
     toast('サインインできませんでした：' + (q.get('error_description') || q.get('error')), 8000); return;
   }
   if (!p || p.state !== q.get('state') || !odReady()) return;
@@ -3024,7 +3054,7 @@ loadData().then(d => {
     toast(`前回のデータ（${customers.size.toLocaleString()}人）を表示しています`, 4000);
   }
   if (viewerMode() && !backFromLogin) odViewerLoad(true);   // refresh to the latest when already signed in
-  // owner: only look at the file dates on OneDrive (no download) and say when there is something newer
+  // owner: look at the file dates on OneDrive and load the newer data by itself
   else setTimeout(checkNewerNow, 3000);
 });
 })();
