@@ -1018,7 +1018,7 @@ details.more .row{margin-top:6px}
       <div id="rfWarn"></div>
       <input type="hidden" name="origModel"><input type="hidden" name="origDate">
       <div class="two">
-        <label>家電<select name="appl"><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>その他</option></select></label>
+        <label>家電<select name="appl"><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>食洗機</option><option>ドアホン</option><option>その他</option></select></label>
         <label>商品（店クラウドVの商品コード）<select name="pcode"></select></label>
       </div>
       <div class="two">
@@ -1056,6 +1056,15 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 // CP target thresholds, same as the My Maps layers: 炊飯器 8年 / レンジ 10年 / IH 12年
 // 案内 thresholds (years); 冷蔵庫・洗濯機 follow the CP columns of 【毎日③】, テレビ has none there so 10 is a placeholder
 const TH = { '炊飯器':8, 'レンジ':10, 'IH':12, 'テレビ':10, '冷蔵庫':10, '洗濯機':8, '給湯器':15, 'エアコン':10 };
+/* 追加の家電（ここ1か所で、名前・アイコンの字・案内の年数・データの中の呼び名を変えられる）。
+   スティック掃除機は掃除機に合わせて数える（同じ人が両方持っていることも多いので、台数は足し合わせる） */
+const APPL_EXTRA = [
+  { k: 'vacuum', cat: '掃除機', mark: '掃', years: 7, names: ['掃除機', 'スティック掃除機'] },
+  { k: 'dish', cat: '食洗機', mark: '食', years: 10, names: ['食洗機', '食器洗い乾燥機'] },
+  { k: 'door', cat: 'ドアホン', mark: 'ド', years: 10, names: ['ドアホン', 'インターホン'] },
+];
+for (const x of APPL_EXTRA) TH[x.cat] = x.years;
+const extraCatOf = name => (APPL_EXTRA.find(x => x.names.some(n => name.includes(n))) || {}).cat;
 const OVER = '#3fd8e8', UNDER = '#e3262b';
 const ageOrder = cat => [`${TH[cat]}年以上`, `${TH[cat]}年未満`, '所有なし'];
 const ageCols = cat => ({ [`${TH[cat]}年以上`]:OVER, [`${TH[cat]}年未満`]:UNDER, '所有なし':GREY });
@@ -1081,8 +1090,10 @@ function staffFromCustom(s) {
   for (let len = 2; len <= Math.min(8, n.length); len++) { const a = STAFF_HASH[fnv(n.slice(0, len))]; if (a) return a; }
   return /店頭/.test(n) ? STORE_STAFF : '';
 }
-const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', aircon:'エアコン', fridge:'冷蔵庫', washer:'洗濯機', heater:'給湯器' };
-const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', 'エアコン':'エ', '冷蔵庫':'冷', '洗濯機':'洗', '給湯器':'湯' };
+const APPL = { rice:'炊飯器', range:'レンジ', ih:'IH', tv:'テレビ', aircon:'エアコン', fridge:'冷蔵庫', washer:'洗濯機', heater:'給湯器',
+  ...Object.fromEntries(APPL_EXTRA.map(x => [x.k, x.cat])) };
+const APPL_MARK = { '炊飯器':'炊', 'レンジ':'レ', 'IH':'熱', 'テレビ':'テ', 'エアコン':'エ', '冷蔵庫':'冷', '洗濯機':'洗', '給湯器':'湯',
+  ...Object.fromEntries(APPL_EXTRA.map(x => [x.cat, x.mark])) };
 const DIMS = {
   rfm:   { label:'RFMランク', order:['A','B','C','D','E','-','未設定'],
            colors:{A:'#ffe500',B:'#a6ea5c',C:'#f2a23a',D:'#b9997c',E:'#e8402a','-':'#222222','未設定':'#5fe3f0'}, get:c => c.rfm || '未設定' },
@@ -1093,6 +1104,7 @@ const DIMS = {
   rice:  { label:'炊飯器 所有年数', order:ageOrder('炊飯器'), colors:ageCols('炊飯器'), get:c => ageBucket(c, '炊飯器') },
   range: { label:'レンジ 所有年数', order:ageOrder('レンジ'), colors:ageCols('レンジ'), get:c => ageBucket(c, 'レンジ') },
   ih:    { label:'熱源 所有年数', order:ageOrder('IH'), colors:ageCols('IH'), get:c => ageBucket(c, 'IH') },
+  ...Object.fromEntries(APPL_EXTRA.map(x => [x.k, { label: `${x.cat} 所有年数`, order: ageOrder(x.cat), colors: ageCols(x.cat), get: c => ageBucket(c, x.cat) }])),
   stage: { label:'接点段階', order:['見込み','推進','チラシ','その他','チラシ等なし'],
            colors:{'見込み':'#c2362b','推進':'#e07b25','チラシ':'#2f68c8','その他':'#7b5fc0','チラシ等なし':GREY}, get:c => c.stage },
   visit: { label:'訪問確認', order:['訪問済み','未訪問'], colors:{'訪問済み':'#0b6e4f','未訪問':GREY}, get:c => c.visits.length ? '訪問済み' : '未訪問' },
@@ -1194,6 +1206,7 @@ function catOf(prefix) {
   if (/炊飯/.test(prefix)) return '炊飯器';
   if (/レンジ|オーブン/.test(prefix)) return 'レンジ';
   if (/IH|ＩＨ|クッキング|コンロ|熱源/i.test(prefix)) return 'IH';
+  const ex = extraCatOf(prefix); if (ex) return ex;   // スティック掃除機 → 掃除機 など
   return prefix.replace(/\d+$/, '') || 'その他';
 }
 
@@ -1270,11 +1283,14 @@ function ingest(rows, fileName) {
       if (d) dated.add(g.cat);
     }
     // how many of each the customer has in 店クラウドV (テレビ台数 / テレビ自店 / テレビ他店), including units beyond the columns
+    // 追加の家電（掃除機＋スティック掃除機 など）は、元の呼び名ごとに覚えて足し合わせる
     for (const k in row) {
-      const m = k.match(/^(テレビ|エアコン|冷蔵庫|洗濯機|レンジ|炊飯器|コンロ熱源|給湯器)(台数|自店|他店)$/);
-      if (!m) continue;
-      const o = ((c.cnt ||= {})[catOf(m[1])] ||= {});
-      o[m[2] === '台数' ? 'n' : m[2] === '自店' ? 'own' : 'other'] = +row[k] || 0;
+      const m = k.match(/^(.+?)(台数|自店|他店)$/);
+      if (!m || !/^(テレビ|エアコン|冷蔵庫|洗濯機|レンジ|炊飯器|コンロ熱源|給湯器)$/.test(m[1]) && !extraCatOf(m[1])) continue;
+      const f = m[2] === '台数' ? 'n' : m[2] === '自店' ? 'own' : 'other', cat = catOf(m[1]);
+      ((c.cntRaw ||= {})[m[1]] ||= {})[f] = +row[k] || 0;
+      const o = ((c.cnt ||= {})[cat] = {});
+      for (const [name, v] of Object.entries(c.cntRaw)) if (catOf(name) === cat) for (const x of ['n', 'own', 'other']) o[x] = (o[x] || 0) + (v[x] || 0);
     }
     // カスタム like "8年以上○": ○ = ownership confirmed by eye; no delivery date needed
     const am = custom.match(/(\d+)\s*年\s*(以上|未満)/);
@@ -1344,7 +1360,7 @@ function arraysToObjects(arr) {
   // keep only the columns the map uses (the ownership file has 233; this makes reading it much faster)
   const keep = head.map((k, i) => [k.replace(/[\s　]/g, ''), i]).filter(([k]) => k && (
     /顧客コード|顧客CD|顧客番号|顧客名|氏名|住所|座標|緯度|経度|ランク|RFM|担当|接点|訪問|カスタム|結合|電話|TEL|携帯/i.test(k) ||
-    /^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他|メーカー)$/.test(k) || /^(テレビ|エアコン|冷蔵庫|洗濯機|レンジ|炊飯器|コンロ熱源|給湯器)(台数|自店|他店)$/.test(k)));
+    /^(.+?)(\d*)(品番|納品日付|納品日|設置場所区分|設置場所|廃棄日付|自他|メーカー)$/.test(k) || /^(テレビ|エアコン|冷蔵庫|洗濯機|レンジ|炊飯器|コンロ熱源|給湯器)(台数|自店|他店)$/.test(k) || (/(台数|自店|他店)$/.test(k) && extraCatOf(k))));
   const out = [];
   for (let j = h + 1; j < arr.length; j++) {
     const r = arr[j];
@@ -1780,9 +1796,11 @@ const LOGOS = [
   { k:'rfm', label:'A〜E（RFM）' }, { k:'s', label:'S（顧客ランク）' }, { k:'blank', label:'空白' },
   { k:'catalog', label:'お店誌' }, { k:'rice', label:'炊飯器' }, { k:'range', label:'レンジ' },
   { k:'ih', label:'熱源' }, { k:'tv', label:'テレビ' }, { k:'aircon', label:'エアコン' }, { k:'fridge', label:'冷蔵庫' }, { k:'washer', label:'洗濯機' }, { k:'heater', label:'給湯器' },
+  ...APPL_EXTRA.map(x => ({ k: x.k, label: x.cat })),
   { k:'contact', label:'接点 1・2・3' }, { k:'visit', label:'訪問' }, { k:'name', label:'名前' },
 ];
-const show = Object.fromEntries(LOGOS.map(l => [l.k, true]));
+// 追加の家電（掃除機・食洗機・ドアホン）は、最初は出さない（「出すアイコン」で選ぶと出る）
+const show = Object.fromEntries(LOGOS.map(l => [l.k, !APPL_EXTRA.some(x => x.k === l.k)]));
 try { Object.assign(show, JSON.parse(localStorage.getItem('yame-logos2') || '{}')); } catch {}
 const labelLayer = L.layerGroup().addTo(map);
 const STAGE_NO = { 'チラシ':1, '推進':2, '見込み':3 };
@@ -1806,7 +1824,8 @@ function labelHTML(c, show, wide) {
   const row0 = [['tv','テ','テレビ'],['aircon','エ','エアコン'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
     const a = currentAppliance(c, cat); return a ? box(t, a, cat) : none(t);
   }).join('');
-  const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','熱','IH']].filter(([k]) => show[k]).map(([k, t, cat]) => {
+  // 2段目: 炊 レ 熱 のあとに 掃 食 ド（追加の家電）
+  const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','熱','IH'], ...APPL_EXTRA.map(x => [x.k, x.mark, x.cat])].filter(([k]) => show[k]).map(([k, t, cat]) => {
     const a = currentAppliance(c, cat); return a ? box(t, a, cat) : none(t);
   }).join('');
   let row2 = '';
@@ -1879,7 +1898,7 @@ function pickLabel(e, code) {
 function chipIcon(k) {
   const old = { date: new Date(TODAY.getFullYear() - 20, 0, 1) };
   const ap = { rice: ['炊', '炊飯器'], range: ['レ', 'レンジ'], ih: ['熱', 'IH'], tv: ['テ', 'テレビ'], aircon: ['エ', 'エアコン'],
-    fridge: ['冷', '冷蔵庫'], washer: ['洗', '洗濯機'], heater: ['湯', '給湯器'] }[k];
+    fridge: ['冷', '冷蔵庫'], washer: ['洗', '洗濯機'], heater: ['湯', '給湯器'], ...Object.fromEntries(APPL_EXTRA.map(x => [x.k, [x.mark, x.cat]])) }[k];
   if (ap) return box(ap[0], old, ap[1]);
   return { rfm: glyph('A', DIMS.rfm.colors.A || '#fff', 'k'), s: glyph('S', '#2346f0', 'k'), blank: '<i class="lb-b lb-sora">空</i>',
     catalog: glyph('お', staffColor('ト'), 'w'), contact: [1, 2, 3].map(n => glyph(n, staffColor('ト'), 'w dg')).join(''),
@@ -1938,6 +1957,7 @@ function renderLogoToggles() {
     row(box('冷', fresh, '冷蔵庫') + box('冷', dummy, '冷蔵庫'), '冷蔵庫　水色＝10年以上・赤＝10年未満') +
     row(box('洗', fresh, '洗濯機') + box('洗', dummy, '洗濯機'), '洗濯機　水色＝8年以上・赤＝8年未満') +
     row(box('湯', fresh, '給湯器') + box('湯', dummy, '給湯器'), '給湯器　水色＝15年以上・赤＝15年未満（ランクの右隣）') +
+    APPL_EXTRA.map(x => row(box(x.mark, fresh, x.cat) + box(x.mark, dummy, x.cat), `${x.cat}　水色＝${x.years}年以上で案内OK・赤＝${x.years}年未満（炊・レ・熱の右）`)).join('') +
     row(noneBox('冷') + noneBox('湯'), 'うすい灰色＝その家電の所有をまだ確認していない（記録なし）') +
     row(box('炊', { ...dummy, store: '他店' }, '炊飯器'), '右上の白い丸＝他店で買ったもの') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '右下の黄色い✓＝下の日付以降に所有を確認') +
@@ -2102,7 +2122,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
   };
   const seenOf = a => checkedOn(a) ? `<span class="nw">${isMaru(a) ? '○ ' : ''}${fmtDate(checkedOn(a))} 確認</span>` : a.maru ? '○ 所有を目視で確認' : '';
   const chkBtn = (cat, a) => a.fromRec ? '' : `<button type="button" class="acheck" data-acheck="${esc(cat)}|${c.appl[cat].indexOf(a)}">確認・変更</button>`;
-  const ORDER = ['炊飯器', 'レンジ', 'IH', '給湯器', 'テレビ', 'エアコン', '冷蔵庫', '洗濯機'];
+  const ORDER = ['炊飯器', 'レンジ', 'IH', '給湯器', 'テレビ', 'エアコン', '冷蔵庫', '洗濯機', ...APPL_EXTRA.map(x => x.cat)];
   const applRows = ORDER.filter(k => ORDER.indexOf(k) < 3 || c.appl[k] || (c.cnt && c.cnt[k] && c.cnt[k].n))
     .concat(Object.keys(c.appl).filter(k => !ORDER.includes(k))).map(cat => {
     const a = currentAppliance(c, cat);
@@ -2771,6 +2791,8 @@ const V_PRODUCTS = {
   '給湯器': [[75001, 'エコキュート'], [74002, '電気温水器'], [74006, '石油給湯機'], [74001, '電気給湯器'], [45008, 'ガス給湯器']],
   'エアコン': [[61004, '冷暖房エアコン室内機'], [62001, 'パッケージエアコン室内機'], [61009, '冷暖房窓用エアコン'], [61007, '冷暖房エアコン床置型']],
   '掃除機': [[42001, '掃除機'], [42002, '充電式・電池式掃除機']],
+  '食洗機': [],     // 店クラウドVの商品コードが分かったら足す（今は空＝店クラウドVの画面で選ぶ）
+  'ドアホン': [],
   'その他': [],
 };
 const V_MAKERS = [['Pana', 'パナソニック'], ['ｼｬｰﾌﾟ', 'シャープ'], ['ﾋﾀﾁ', '日立'], ['ﾄｳｼﾊﾞ', '東芝'], ['ﾐﾂﾋﾞｼ', '三菱'], ['ｿﾆｰ', 'ソニー'],
