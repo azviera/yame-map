@@ -2068,7 +2068,8 @@ function select(code, pan) {
   $('#panel').classList.remove('open');
   // keep the chosen pin visible beside (PC) or above (phone) the card
   if (c.lat != null && (pan || innerWidth <= 860)) {
-    const z = pan ? Math.max(map.getZoom(), 16) : map.getZoom();
+    // 検索で選んだ人へ移るときは、いつも現在地ボタンの「詳細」と同じ段階（15段階＝ズーム19。航空写真は写真のある所まで）
+    const z = pan ? Math.min(map.getMaxZoom(), ME_STAGE.near + STAGE0) : map.getZoom();
     const off = innerWidth <= 860 ? L.point(0, $('#card').offsetHeight / 2) : L.point(190, 0);
     map.setView(map.unproject(map.project([c.lat, c.lng], z).add(off), z), z, { animate: false });
   }
