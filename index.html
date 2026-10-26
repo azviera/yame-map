@@ -658,6 +658,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #rfKind input{accent-color:#fff}
 #rfKind label[hidden]{display:none}
 #rfKindHint{font-size:12px;color:var(--muted,#666);margin-top:-4px}
+#recForm .seg label.cur{border-color:var(--accent);font-weight:700}   /* 今配っている季節のお店誌 */
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
@@ -963,7 +964,11 @@ details.more .row{margin-top:6px}
     <h3 id="rfTitle">記録をつける</h3>
     <div id="rfWho" class="recstate"></div>
     <div class="seg" id="rfKind">
-      <label><input type="checkbox" name="kind" value="お店誌">お店誌を渡した</label>
+      <label><input type="checkbox" name="kind" value="お店誌春">お店誌 春</label>
+      <label><input type="checkbox" name="kind" value="お店誌夏">お店誌 夏</label>
+      <label><input type="checkbox" name="kind" value="お店誌秋">お店誌 秋</label>
+      <label><input type="checkbox" name="kind" value="お店誌冬">お店誌 冬</label>
+      <label><input type="checkbox" name="kind" value="カレンダー">カレンダー</label>
       <label><input type="checkbox" name="kind" value="訪問">訪問した</label>
       <label><input type="checkbox" name="kind" value="所有確認"><span id="rfApplTxt">新しく見つけた家電</span></label>
       <label><input type="checkbox" name="kind" value="Aチラシ">1 チラシ</label>
@@ -1465,6 +1470,7 @@ async function checkNewerNow() {
   try {
     const t = await odToken(); if (!t) return;   // never sends anyone to the sign-in page from here
     const list = await odFolderChildren(t);
+    await odReadSettings(list);   // 黄色い✓の日付・お店誌の今の季節
     checkNewer(list);
     if (!(srcNewer || !sources.length || isSample)) { autoFails = 0; return; }
     if (!$('#recForm').hidden) { newerAt = 0; return; }
@@ -2100,7 +2106,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
       <div class="blk recblk"><h3>記録をつける</h3>
-        <div class="row"><button class="btn" type="button" data-rec="お店誌">お店誌を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
+        <div class="row"><button class="btn" type="button" data-rec="${CAT_KIND(CATALOG.current)}">お店誌（${CATALOG.current}）を渡した</button><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
         <div class="row"><button class="btn" type="button" data-rec="Aチラシ">1 チラシ</button><button class="btn" type="button" data-rec="B推進">2 推進</button><button class="btn" type="button" data-rec="C見込み">3 見込み</button></div>
         ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
@@ -2358,8 +2364,20 @@ async function odReadSettings(list) {
   if (!f) return;
   try {
     const s = await (await fetch(f['@microsoft.graph.downloadUrl'])).json();
+    odSettings = s;
     setCheckSince(s.checkSince || '', false);
+    applyCatalogSettings(s['お店誌']);
   } catch {}
+}
+let odSettings = {};   // 地図の設定.json の中身（保存するときにほかの項目を消さないため）
+// お店誌の今の季節・期間（地図の設定.json の "お店誌"）。変わったら地図の印を当て直す
+function applyCatalogSettings(o) {
+  if (!o) return;
+  const cur = CATALOG.seasons.includes(o['今の季節']) ? o['今の季節'] : CATALOG.current;
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(o['開始日'] || '') ? o['開始日'] : CATALOG.from, to = /^\d{4}-\d{2}-\d{2}$/.test(o['終了日'] || '') ? o['終了日'] : CATALOG.to;
+  if (cur === CATALOG.current && from === CATALOG.from && to === CATALOG.to) return;
+  Object.assign(CATALOG, { current: cur, from, to });
+  if (customers.size) recRedraw();
 }
 async function odSaveSettings() {
   const v = lsGet('yame-check-since-str') || '';
@@ -2370,7 +2388,7 @@ async function odSaveSettings() {
       if (!odFolderRef) await odFolderChildren(token);
       const res = await fetch(`https://graph.microsoft.com/v1.0/drives/${odFolderRef.drive}/items/${odFolderRef.id}:/${encodeURIComponent(SETTINGS_NAME)}:/content`, {
         method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkSince: v, savedAt: new Date().toISOString() }) });
+        body: JSON.stringify({ ...odSettings, checkSince: v, savedAt: new Date().toISOString() }) });   // お店誌の季節などほかの設定は残す
       if (!res.ok) { const e = new Error(`設定を保存できませんでした（${res.status}）`); e.status = res.status; throw e; }
     });
     if (r.needLogin) { lsSet('yame-od-pending', 'savecfg'); await odLogin(); return; }
@@ -2447,6 +2465,12 @@ function computeRecords() {
 }
 // キャンペーンの接点（店クラウドVの Aチラシ・B推進・C見込み）。地図では 1・2・3 の印
 const CP_KINDS = ['Aチラシ', 'B推進', 'C見込み'];
+/* お店誌は季節ごとの号（記録の種類は お店誌春・お店誌夏・お店誌秋・お店誌冬）。地図の●★は「今配っている季節」の記録で決める。
+   今の季節と期間は「地図の設定.json」の "お店誌": {"今の季節": "秋", "開始日": "2026-09-02", "終了日": "2026-11-30"} で変えられる（ここは初めの値） */
+const CATALOG = { seasons: ['春', '夏', '秋', '冬'], current: '秋', from: '2026-09-02', to: '2026-11-30' };
+const CAT_KIND = s => 'お店誌' + s;
+const catSeasonOf = r => r.kind === 'お店誌' ? CATALOG.current : (r.kind.match(/^お店誌(春|夏|秋|冬)$/) || [])[1] || '';   // 'お店誌' は季節を分ける前の記録
+const catCounts = r => catSeasonOf(r) === CATALOG.current && (!r.date || (r.date >= CATALOG.from && r.date <= CATALOG.to));
 // put the records onto the customers (undoing what an earlier pass added first)
 function applyRecords() {
   for (const [code, c] of rHidden) customers.set(code, c);   // ランクRで外していた人も、記録を当て直してから決め直す
@@ -2468,7 +2492,8 @@ function applyRecords() {
     const d = r.date ? new Date(r.date + 'T00:00:00') : null;
     if (r.kind === '訪問') c.visits.push({ date: d, staff: r.staff, kind: '訪問', custom: '', fromRec: true });
     else if (CP_KINDS.includes(r.kind)) c.events.push({ date: d, staff: r.staff, kind: r.kind, custom: '', fromRec: true });   // 1チラシ・2推進・3見込み
-    else if (r.kind === 'お店誌') {
+    else if (catSeasonOf(r)) {
+      if (!catCounts(r)) continue;   // ほかの季節・期間外のお店誌は、地図の印には使わない（記録には残る）
       if (!('_cat0' in c)) { c._cat0 = c.catalog; c._ct0 = c.catalogTarget; }
       c.catalog = r.staff; c.catalogTarget = true;
     } else if (r.kind === '所有確認') {
@@ -2697,7 +2722,8 @@ function openRecForm(kind, code, rec, ex) {
       year: '', dlv: a.date ? isoDay(a.date) : '', maker: a.maker || '', place: a.place || '', store: a.store || '',
       origModel: a.model || '', origDate: fmtDate(a.date) || '' });
   }
-  const v = rec || base;
+  const v = rec && rec.kind === 'お店誌' ? { ...rec, kind: CAT_KIND(CATALOG.current) } : rec || base;   // 季節を分ける前の記録は今の季節として直す
+  for (const s of CATALOG.seasons) f.querySelector(`input[name="kind"][value="${CAT_KIND(s)}"]`).closest('label').classList.toggle('cur', s === CATALOG.current);
   $('#rfTitle').textContent = rec ? '記録を直す' : ex ? '持っている家電の確認・変更' : '記録をつける';
   $('#rfWho').textContent = `${c.name || '（名称なし）'}（顧客コード ${c.code}）`;
   for (const el of f.elements) {
@@ -2790,7 +2816,7 @@ $('#recForm form').addEventListener('submit', e => {
   for (const inp of e.target.querySelectorAll('input[data-date]')) if (!checkDay(inp)) { inp.focus(); toast('日付を確かめてください（例 20180223・2018/2/23）', 3500); return; }
   const f = e.target, c = customers.get(recEditing.code);
   const kinds = selKinds();
-  if (!kinds.length) { toast('「お店誌・訪問・所有確認・1〜3」のどれかを選んでください', 3000); return; }
+  if (!kinds.length) { toast('「お店誌・カレンダー・訪問・所有確認・1〜3」のどれかを選んでください', 3000); return; }
   for (const kind of kinds) if (CP_KINDS.includes(kind)) {   // 同じ印をもう一度つけようとしていないか
     const st = stageOf(kind), dupRec = [...computeRecords().recs.values()].some(r => r.code === c.code && r.kind === kind && r.id !== recEditing.id);
     const dupV = c.events.some(ev => !ev.fromRec && stageOf(ev.kind) === st);
@@ -2849,7 +2875,8 @@ $('#recExportGo').addEventListener('click', () => {
     const d = r.date.replace(/-/g, '/');
     if (r.kind === '訪問') return '接点の「訪問」にチェック';
     if (CP_KINDS.includes(r.kind)) return `接点の「${r.kind}」にチェック`;
-    if (r.kind === 'お店誌') { const m = +r.date.slice(5, 7); return `接点の「特選品${m >= 3 && m <= 5 ? '春' : m >= 6 && m <= 8 ? '夏' : m >= 9 && m <= 11 ? '秋' : '冬'}」にチェック`; }
+    if (catSeasonOf(r)) { const s = catSeasonOf(r); return `接点の「お店誌${s}（旧 特選品${s}）」にチェック`; }
+    if (r.kind === 'カレンダー') return '接点の「カレンダ」にチェック';
     if (r.status === '処分済み') return `元の所有を「廃棄」・廃棄日付 ${d}`;
     if (r.status === '譲渡') return `元の所有を「贈答」・廃棄日付 ${d}`;
     if (r.status) return `元の所有の廃棄日付に ${d}` + (r.model && normQ(r.model) !== normQ(r.origModel) ? '・型式を直す' : '') + (r.dlv && r.dlv.replace(/-/g, '/') !== r.origDate ? '・納品日を直す' : '');
