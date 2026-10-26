@@ -617,8 +617,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* top bar */
 #top{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border-bottom:1px solid var(--line);
   padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:1000}
-#brand{font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap;display:flex;align-items:center;gap:8px}
-#brand .mark{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);display:inline-block}
 #searchWrap{flex:1 1 180px;min-width:0;position:relative}
 #search{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 12px;font-size:16px}
 #search{padding-right:40px}#search::-webkit-search-cancel-button{display:none}   /* 右の×（自前）で一気に消す */
@@ -856,7 +854,6 @@ details.more .row{margin-top:6px}
   #panelToggle{display:none}
   /* 1行に: 検索窓・メニュー・色分け（地図を広く） */
   #top{flex-wrap:nowrap;gap:6px;padding-block:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
-  #brand{display:none}
   #searchWrap{order:0;flex:1 1 auto}
   #hits{right:auto;width:calc(100vw - 20px)}
   #search:placeholder-shown{padding-right:8px;padding-left:10px}   /* 空のときは×が出ないので、案内の文字を広く */
@@ -886,14 +883,12 @@ details.more .row{margin-top:6px}
   #top{flex-wrap:nowrap;padding-block:4px;gap:8px}
   #searchWrap{order:0;flex:1 1 160px}
   #search{height:34px}
-  #brand .txt{display:none}
 }
 </style>
 
 <div id="app">
   <header id="top">
     <button class="btn" id="panelToggle" type="button" aria-controls="panel">◀ 情報を隠す</button>
-    <div id="brand"><span class="mark" aria-hidden="true"></span><span class="txt">八女 顧客マップ</span></div>
     <div id="searchWrap">
       <input id="search" type="search" placeholder="名前・電話番号の下4桁・顧客番号で探す" aria-label="顧客を探す" autocomplete="off"><button type="button" id="searchClear" aria-label="入力を消す" hidden>×</button>
       <div id="hits" hidden><ul id="list"></ul><div class="more" id="listMore"></div></div>
