@@ -662,6 +662,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .catrow .lt{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
 .catrow .btn.sm{padding:6px 10px;min-width:40px}
 .catrow .btn.cur{border:2px solid var(--accent);font-weight:700}
+/* 季節のボタン: 字の下に、その季節をこのお客様に最後に配った年。今の号を配り済みなら色付き＋✓ */
+.catrow .btn.season{display:inline-flex;flex-direction:column;align-items:center;line-height:1.1;padding:4px 8px;min-width:44px}
+.catrow .btn.season small{font-size:10px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;min-height:11px}
+.catrow .btn.season.given{background:#e3f6ec;border-color:#2e9e62}
+.catrow .btn.season.given small{color:#1f7a49;font-weight:700}
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
@@ -2194,6 +2199,17 @@ function renderDataState() {
 
 /* ---------- customer card ---------- */
 // カードのお店誌の行: 今の号の様子（渡した季節・担当）と、最後に渡した日・何日前か（まだ早いか）
+// 季節ごとに、このお客様へ最後に配った号の年（{秋: 2026, 春: 2025 …}）。店クラウドVの接点（履歴）・地図用データ.json の 渡した・地図アプリの記録から。
+// 冬号は12月〜2月にまたがるので、1・2月に渡した冬号は前の年の号として数える（配り始めの年）
+const issueYear = (season, day) => { const y = +day.slice(0, 4), m = +day.slice(5, 7); return season === '冬' && m <= 2 ? y - 1 : y; };
+function catYears(c) {
+  const yrs = {};
+  const take = (s, day) => { if (!s || !/^\d{4}-\d{2}/.test(day || '')) return; const y = issueYear(s, day); if (!yrs[s] || y > yrs[s]) yrs[s] = y; };
+  for (const e of c.hist || []) take(seasonOfKind(e.kind), e.day);
+  for (const e of c.catSent || []) take(e.season, e.day);
+  for (const r of computeRecords().recs.values()) if (r.code === c.code) take(catSeasonOf(r), r.date);
+  return yrs;
+}
 function catLine(c) {
   const parts = [];
   if (c.catalog) parts.push(`お店誌 ${c.catSeason || CATALOG.current} ${c.catalog}`);
@@ -2253,7 +2269,9 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
         <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
       <div class="blk recblk"><h3>記録をつける</h3>
-        <div class="row catrow"><span class="lt">お店誌</span>${CATALOG.seasons.map(s => `<button class="btn sm${s === CATALOG.current ? ' cur' : ''}" type="button" data-rec="${CAT_KIND(s)}">${s}</button>`).join('')}<button class="btn sm" type="button" data-rec="カレンダー">カレンダー</button></div>
+        <div class="row catrow"><span class="lt">お店誌</span>${(() => { const yrs = catYears(c); return CATALOG.seasons.map(s => {
+          const given = s === CATALOG.current && c.catalog;   // 今の号はもう渡した
+          return `<button class="btn sm season${s === CATALOG.current ? ' cur' : ''}${given ? ' given' : ''}" type="button" data-rec="${CAT_KIND(s)}" title="${yrs[s] ? `${s}号を最後に渡した年：${yrs[s]}` : `${s}号はまだ渡していません`}"><span>${given ? '✓' : ''}${s}</span><small>${yrs[s] || ''}</small></button>`; }).join(''); })()}<button class="btn sm" type="button" data-rec="カレンダー">カレンダー</button></div>
         <div class="row"><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
         <div class="row">${CP_KINDS.map(k => `<button class="btn" type="button" data-rec="${k}">${esc(stageLabel(k))}</button>`).join('')}</div>
         ${recListHTML(c.code)}</div>
