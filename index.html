@@ -946,6 +946,21 @@ details.more .row{margin-top:6px}
 .sumt tr.sub td{color:var(--muted)}
 .sdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
 .cpt th:first-child{white-space:normal;min-width:9em}
+/* スマホではキャンペーン表を1件ずつのカードにして、数字のすぐ上に項目名を出す（見出しがスクロールで消えない・横にはみ出さない） */
+@media (max-width:640px){
+  .cpt,.cpt tbody{display:block}
+  .cpt tr:first-child{display:none}
+  .cpt tr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;padding:12px 2px;border-bottom:1px solid var(--line)}
+  .cpt th,.cpt td{border:0;padding:0;text-align:left;white-space:normal}
+  .cpt th:first-child{grid-column:1/-1;min-width:0;font-size:14px}
+  .cpt td{font-size:15px}
+  .cpt td::before{content:attr(data-l);display:block;font-size:11px;color:var(--muted);font-weight:400;margin-bottom:1px}
+  .cpt td.met{grid-column:1/-1;order:5}
+  .cpt td.met .bar{width:90px}
+  .cpt td.go{grid-column:1/-1;order:6}
+  .cpt td.go::before{display:none}
+  .cpt td.go .btn{width:100%;height:36px;font-size:14px}
+}
 .ph{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;color:#fff}
 .ph.seed{background:#8a6a2f}.ph.grow{background:#3f8a4f}.ph.harvest{background:#c58a12}.ph.done{background:#8a8f96}
 .bar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);margin-right:6px;vertical-align:middle;overflow:hidden}
@@ -3473,9 +3488,9 @@ function renderSummary() {
     const sold = salesIn(cp.from, cp.to, cp.cats);
     const w = due.length ? Math.round(dueMet / due.length * 100) : 0;
     return `<tr><th>${esc(cp.name)} <span class="ph ${PHASE_CLS[ph]}">${ph}</span><small>${cp.cats.map(c => esc(catName(c))).join('・')}　${fmt(cp.from)}〜${fmt(cp.to)}</small></th>
-      <td>${due.length}</td>
-      <td><div class="bar"><i style="width:${w}%"></i></div>${dueMet}（${pct(dueMet, due.length)}）</td><td>${dueHope}</td><td class="b">${sold.length}</td>
-      <td><button type="button" class="btn" data-cpfocus="${i}">地図で見る</button></td></tr>`;
+      <td data-l="替え時の家">${due.length}</td>
+      <td class="met" data-l="種まき後に会えた家"><div class="bar"><i style="width:${w}%"></i></div>${dueMet}（${pct(dueMet, due.length)}）</td><td data-l="見込み">${dueHope}</td><td class="b" data-l="販売">${sold.length}</td>
+      <td class="go"><button type="button" class="btn" data-cpfocus="${i}">地図で見る</button></td></tr>`;
   }).join('');
   box.innerHTML = `
     <p class="sum-range">${esc(R.label)}：${fmt(R.from)}〜${fmt(R.to)}　地図のお客様 ${total.toLocaleString()}軒</p>
