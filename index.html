@@ -976,11 +976,11 @@ details.more .row{margin-top:6px}
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
-      <div class="widesel"><span>広域で出すアイコン（引いた地図・1〜11段階）</span>
+      <div class="widesel"><span>広域で出すアイコン</span>
         <button type="button" class="iconpick" id="widePick"></button></div>
-      <div class="widesel"><span>中域で出すアイコン（12〜14段階）</span>
+      <div class="widesel"><span>中域で出すアイコン</span>
         <button type="button" class="iconpick" id="midPick"></button></div>
-      <div class="widesel"><span>詳細で出すアイコン（いちばん拡大・15〜18段階）</span>
+      <div class="widesel"><span>詳細で出すアイコン</span>
         <button type="button" class="iconpick" id="nearPick"></button></div>
       <div class="widesel"><label for="checkSince">黄色い✓：この日以降に確認したもの</label>
         <div class="datepick btn"><span id="checkSinceTxt">指定なし（確認日があれば全部）</span><span aria-hidden="true">📅</span><input type="date" id="checkSince" aria-label="黄色い✓の基準日"></div></div>
@@ -1998,7 +1998,7 @@ function chipIcon(k) {
     visit: glyph('訪', staffColor('タ'), 'w'), name: '<i class="lb-b" style="background:#333;color:#fff">名</i>' }[k] || '';
 }
 const pickSet = zoneSet;
-const PICK_TITLE = { wide: '広域（1〜11段階）で出すアイコン', mid: '中域（12〜14段階）で出すアイコン', near: '詳細（15〜18段階）で出すアイコン' };
+const PICK_TITLE = { wide: '広域で出すアイコン', mid: '中域で出すアイコン', near: '詳細で出すアイコン' };
 function renderPicks() {
   for (const which of ['wide', 'mid', 'near']) {
     const s = pickSet(which);
