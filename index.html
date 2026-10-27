@@ -1883,7 +1883,9 @@ const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 function catalogPin(c, wide) {
   const early = catTooSoon(c) ? '<span class="lb-early"></span>' : '';
   if (c.catalog) {
-    const col = staffColor(c.catalog), s = !wide && c.catSeason ? `<b style="color:${inkOn(col)}">${esc(c.catSeason)}</b>` : '';
+    // ●は今の号のお店誌を渡した人。季節が分からない（前の版で読んで端末に残っているデータなど）ときは今の季節
+    const season = c.catSeason || CATALOG.current;
+    const col = staffColor(c.catalog), s = !wide && season ? `<b style="color:${inkOn(col)}">${esc(season)}</b>` : '';
     return early + `<span class="lb-pin${s ? ' cs' : ''}" style="--c:${col}">${s}</span>`;
   }
   if (c.catalogTarget) return early + STAR;   // on the お店誌 list (RFM A) but not sent yet
@@ -1917,8 +1919,11 @@ function labelHTML(c, show, wide) {
     row3 = [...seen.keys()].sort().map(n => glyph(stageMark(n), seen.get(n), 'w dg')).join('');
   }
   let pin = '';
+  const plainPin = `<span class="lb-pin${isRing(dim, c.vals[dim]) ? ' ring' : ''}" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   if (show.catalog) pin = catalogPin(c, wide);
-  else pin = `<span class="lb-pin${isRing(dim, c.vals[dim]) ? ' ring' : ''}" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
+  // 下のバーで「お店誌」の色分けにしているときも、渡した人の●には季節の字・日が浅い人には点線の輪
+  else if (dim === 'catalog') pin = c.catalog ? catalogPin(c, wide) : (catTooSoon(c) ? '<span class="lb-early"></span>' : '') + plainPin;
+  else pin = plainPin;
   const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
   return `<div class="lab${selected === c.code ? ' sel' : ''}" data-code="${esc(c.code)}"><div class="lb-left"><div class="r">${row0}</div><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
 }
@@ -2191,7 +2196,7 @@ function renderDataState() {
 // カードのお店誌の行: 今の号の様子（渡した季節・担当）と、最後に渡した日・何日前か（まだ早いか）
 function catLine(c) {
   const parts = [];
-  if (c.catalog) parts.push(`お店誌 ${c.catSeason || ''} ${c.catalog}`.replace(/\s+/g, ' '));
+  if (c.catalog) parts.push(`お店誌 ${c.catSeason || CATALOG.current} ${c.catalog}`);
   else if (c.catalogTarget) parts.push(`お店誌 ${CATALOG.current}：まだ（★）`);
   const l = lastCatalog(c);
   if (l) { const n = daysSince(l.day); parts.push(`${l.season || ''}を${+l.day.slice(5, 7)}/${+l.day.slice(8, 10)}に渡した（${n}日前${n <= CAT_GAP_DAYS ? '・まだ早い' : ''}）`); }
