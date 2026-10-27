@@ -1884,13 +1884,16 @@ const noneBox = t => `<i class="lb-b lb-none">${t}</i>`;
 const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}${a.store === '他店' ? ' ta' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
-// 中域・詳細では●の中に渡した季節の1文字（広域は丸が小さいので色だけ）。前のお店誌を渡してまだ日が浅い人は、外側に点線の輪（まだ早い）
+// ●の中に渡した季節の1文字。広域でも9段階（ズーム13）より寄っていれば字を入れる（それより引くと丸が重なって読めないので色だけ）。
+// 前のお店誌を渡してまだ日が浅い人は、外側に点線の輪（まだ早い）
+const CAT_WIDE_ZOOM = 13;
+const catLetters = wide => !wide || map.getZoom() >= CAT_WIDE_ZOOM;
 function catalogPin(c, wide) {
   const early = catTooSoon(c) ? '<span class="lb-early"></span>' : '';
   if (c.catalog) {
     // ●は今の号のお店誌を渡した人。季節が分からない（前の版で読んで端末に残っているデータなど）ときは今の季節
     const season = c.catSeason || CATALOG.current;
-    const col = staffColor(c.catalog), s = !wide && season ? `<b style="color:${inkOn(col)}">${esc(season)}</b>` : '';
+    const col = staffColor(c.catalog), s = catLetters(wide) && season ? `<b style="color:${inkOn(col)}">${esc(season)}</b>` : '';
     return early + `<span class="lb-pin${s ? ' cs' : ''}" style="--c:${col}">${s}</span>`;
   }
   if (c.catalogTarget) return early + STAR;   // on the お店誌 list (RFM A) but not sent yet
@@ -1927,7 +1930,8 @@ function labelHTML(c, show, wide) {
   const plainPin = `<span class="lb-pin${isRing(dim, c.vals[dim]) ? ' ring' : ''}" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   if (show.catalog) pin = catalogPin(c, wide);
   // 下のバーで「お店誌」の色分けにしているときも、渡した人の●には季節の字・日が浅い人には点線の輪
-  else if (dim === 'catalog') pin = c.catalog ? catalogPin(c, wide) : (catTooSoon(c) ? '<span class="lb-early"></span>' : '') + plainPin;
+  // 対象でまだの人は★（黄色い丸ではなく）、対象外の人はバーと同じ「お店誌なし」の色の丸
+  else if (dim === 'catalog') pin = c.catalog || c.catalogTarget ? catalogPin(c, wide) : (catTooSoon(c) ? '<span class="lb-early"></span>' : '') + plainPin;
   else pin = plainPin;
   const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
   return `<div class="lab${selected === c.code ? ' sel' : ''}" data-code="${esc(c.code)}"><div class="lb-left"><div class="r">${row0}</div><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
@@ -1950,19 +1954,27 @@ let midSet;
 try { const m2 = JSON.parse(localStorage.getItem('yame-mid') || 'null'); if (Array.isArray(m2)) midSet = new Set(m2.filter(k => LOGO_KEYS.includes(k))); } catch {}
 midSet ||= new Set(LOGO_KEYS.filter(k => show[k]));
 const zoneSet = zone => zone === 'wide' ? wideSet : zone === 'mid' ? midSet : new Set(LOGO_KEYS.filter(k => show[k]));
-const iconMode = () => zoneSet(zoneOf()).size > 0;
+// お店誌の印を出すとき（下のバーで「お店誌」、またはその区分で「お店誌」を選んだとき）は、広域でも9段階より寄っていればアイコン表示に
+const catalogShown = () => dim === 'catalog' || zoneSet(zoneOf()).has('catalog');
+// 広域でほかのアイコンを選ばず、下のバーの「お店誌」だけで印を出しているとき: 印のある人（渡した・まだ・日が浅い）だけアイコンにする
+const catOnlyWide = () => zoneOf() === 'wide' && !zoneSet('wide').size && dim === 'catalog';
+const catIcon = c => c.catalog || c.catalogTarget || !!catTooSoon(c);
+const iconMode = () => zoneSet(zoneOf()).size > 0 || (dim === 'catalog' && map.getZoom() >= CAT_WIDE_ZOOM);
 let renderedArea = null, renderedZoom = null;
 function renderLabels() {
   labelLayer.clearLayers();
   renderedArea = null;
+  applyIconScale();   // 色分けを「お店誌」に変えたときも、広域の印の大きさを合わせる
   if (!iconMode()) return;
   const zone = zoneOf(), full = zone !== 'wide';
   const b = map.getBounds().pad(full ? 0.25 : 0.1);
   renderedArea = b; renderedZoom = map.getZoom();
   const set = zoneSet(zone), flags = Object.fromEntries(LOGO_KEYS.map(k => [k, set.has(k)]));
   let n = 0;
+  const catOnly = catOnlyWide();
   for (const c of customers.values()) {
     if (c.lat == null || !passes(c) || !b.contains([c.lat, c.lng])) continue;
+    if (catOnly && !catIcon(c)) continue;   // お店誌の印のない人は、軽い色の点のまま（たくさんあっても重くならないように）
     if (++n > (full ? 800 : 3000)) break;
     L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'lab-wrap' + (todayOn && !todayCodes.has(c.code) ? ' dim' : ''), html: labelHTML(c, flags, !full), iconSize: [0, 0] }),
       zIndexOffset: selected === c.code ? 2000 : c.rank === 'S' ? 500 : 0, keyboard: false })
@@ -2050,7 +2062,8 @@ function renderLogoToggles() {
 }
 // dots and 広域 icons shrink as the map zooms out; 中域 icons are the usual size, 詳細 (houses far apart on screen) a quarter bigger
 const dotScale = () => { const z = map.getZoom(); return z >= DOT_FULL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (DOT_FULL_ZOOM - z) * 0.08); };
-const iconScale = () => ({ wide: dotScale(), mid: 0.65, near: 0.8125 })[zoneOf()];
+// 広域でお店誌の印（季節の字入り）を出すときは、字が読める大きさより小さくしない
+const iconScale = () => { const z = zoneOf(); return z === 'wide' ? (catalogShown() && map.getZoom() >= CAT_WIDE_ZOOM ? Math.max(dotScale(), 0.6) : dotScale()) : z === 'mid' ? 0.65 : 0.8125; };
 // 現在地ボタンの中の丸: 詳細＝大きい・中域＝中くらい・広域＝小さい（ピンチで変えたときも）
 const applyIconScale = () => { $('#map').style.setProperty('--s', iconScale()); $('#meZoneDot').setAttribute('r', { wide: 3, mid: 5, near: 7.5 }[zoneOf()]); };
 applyIconScale();
@@ -2103,11 +2116,12 @@ function rebuild(fit) {
 }
 function refresh() {
   let shown = 0;
+  const icons = iconMode(), catOnly = catOnlyWide();
   for (const c of customers.values()) {
     const m = markers.get(c.code); if (!m) continue;
     const ok = passes(c);
     if (ok) shown++;
-    if (ok && !iconMode()) { m.setStyle(styleFor(c)); if (!map.hasLayer(m)) m.addTo(map); }
+    if (ok && (!icons || (catOnly && !catIcon(c)))) { m.setStyle(styleFor(c)); if (!map.hasLayer(m)) m.addTo(map); }
     else if (map.hasLayer(m)) map.removeLayer(m);
   }
   renderLabels();
