@@ -801,7 +801,6 @@ details.more .row{margin-top:6px}
 .lb-g.w{-webkit-text-stroke:3px #fff}
 .lb-g.dg{font-size:14px}
 .lb-b.ta{position:relative}.lb-b.ta::after{content:"";position:absolute;right:-2px;top:-2px;width:6px;height:6px;border-radius:50%;background:#fff;border:1.5px solid #000}   /* 印はアイコンの角の中に収める */
-.lb-b.no{position:relative}.lb-b .nx{position:absolute;left:-4px;top:-6px;color:#c62828;font-size:12px;line-height:12px;font-weight:900;-webkit-text-stroke:2.5px #fff;paint-order:stroke fill}   /* 今は要らない: 左上に赤い× */
 .lb-b.maru{position:relative}   /* 所有を確認: 右下に黄色い丸と✓（右上の白い丸＝他店と区別） */
 .lb-b.maru::before{content:"✓";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;background:#ffd400;border:1.5px solid #000;color:#000;font-size:7px;line-height:8px;font-weight:900;text-align:center;box-sizing:content-box}
 .lb-sora{background:#5fe3f0;color:#000;border-color:#000}
@@ -814,7 +813,7 @@ details.more .row{margin-top:6px}
 .keyrow{display:grid;grid-template-columns:96px 1fr;align-items:start;gap:8px;font-size:12px}
 .keyrow .ic{display:flex;gap:2px;justify-content:flex-end}
 .keyrow .lb-b,.keyrow .lb-dg{position:static}
-.keyrow .lb-b.ta,.keyrow .lb-b.maru,.keyrow .lb-b.no{position:relative}   /* 見方の欄でも白い丸・黄色い✓を見せる */
+.keyrow .lb-b.ta,.keyrow .lb-b.maru{position:relative}   /* 見方の欄でも白い丸・黄色い✓を見せる */
 .keyrow .ic{padding:4px 6px 5px 0}
 .widesel{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:13px;font-weight:700}
 .widesel select{height:38px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft);padding:0 8px;font-weight:700}
@@ -1036,9 +1035,8 @@ details.more .row{margin-top:6px}
       <label><input type="checkbox" name="kind" value="Aチラシ"><span data-stage="Aチラシ">1 留守</span></label>
       <label><input type="checkbox" name="kind" value="B推進"><span data-stage="B推進">2 面会</span></label>
       <label><input type="checkbox" name="kind" value="C見込み"><span data-stage="C見込み">3 見込み</span></label>
-      <label><input type="checkbox" name="kind" value="不要">今は要らない</label>
     </div>
-    <label class="hopeOnly" hidden><span id="rfHopeTxt">見込みの家電（何の家電の見込みか）</span><select name="hope"><option value="">－</option><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>食洗機</option><option>ドアホン</option><option>その他</option></select></label>
+    <label class="hopeOnly" hidden>見込みの家電（何の家電の見込みか）<select name="hope"><option value="">－</option><option>炊飯器</option><option>レンジ</option><option>熱源</option><option>テレビ</option><option>冷蔵庫</option><option>洗濯機</option><option>給湯器</option><option>エアコン</option><option>掃除機</option><option>食洗機</option><option>ドアホン</option><option>その他</option></select></label>
     <div id="rfKindHint">いくつでも選べます（まとめて1回の「保存」で記録）。「新しく見つけた家電」はひとつだけで記録します</div>
     <div class="two">
       <label><span id="rfDateTxt">日付</span><span class="dateIn"><input name="date" data-date required inputmode="numeric" autocomplete="off" placeholder="例 20261021"><button type="button" class="dateBtn" aria-label="カレンダーで選ぶ">📅</button></span><small class="dateHint"></small></label>
@@ -1244,8 +1242,7 @@ const CP_KINDS = ['Aチラシ', 'B推進', 'C見込み'];
 /* 1・2・3 の名前（2026/10/27から 1留守・2面会・3見込み）。店クラウドVの欄は同じ A・B・C を使う。
    「地図の設定.json」の "接点の名前": {"1": "留守", "2": "面会", "3": "見込み"} で変えられる。
    3見込み＝「キャンペーンの価格がわかったら知らせて」と言われた。何の家電の見込みかも記録する */
-const STAGE_SINCE = '2026-10-27';
-const NOPE_DAYS = 365;   // 「今は要らない」の×を出す日数   // 1留守・2面会・3見込みに切り替えた日
+const STAGE_SINCE = '2026-10-27';   // 1留守・2面会・3見込みに切り替えた日
 const STAGE_NAMES = { 'Aチラシ': '留守', 'B推進': '面会', 'C見込み': '見込み' };
 const stageLabel = k => STAGE_NAMES[k];
 const stageMark = n => (STAGE_NAMES[CP_KINDS[n - 1]] || String(n)).slice(0, 1);
@@ -1862,15 +1859,13 @@ const show = Object.fromEntries(LOGOS.map(l => [l.k, !APPL_EXTRA.some(x => x.k =
 try { Object.assign(show, JSON.parse(localStorage.getItem('yame-logos2') || '{}')); } catch {}
 const labelLayer = L.layerGroup().addTo(map);
 const STAGE_NO = { 'チラシ':1, '推進':2, '見込み':3 };
-// 今は要らない（家電ごと）: その家電のアイコンの左上に×。所有の記録がない家電でも×は出す
-const withNope = (c, cat) => { const a = currentAppliance(c, cat); return c.nope && c.nope[cat] ? { ...(a || { none: true }), nope: true } : a; };
 const staffColor = s => STAFF_COL[s] || GREY;
 // お店誌の対象でまだの人: 黒い丸に金色の星（航空写真でも明るい地図でもくっきり見える）
 const STAR = `<svg class="lb-star" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#111"/><path d="M12 3.6L14.1 9.6 20.4 9.8 15.4 13.6 17.2 19.6 12 16 6.8 19.6 8.6 13.6 3.6 9.8 9.9 9.6z" fill="#ffc31a" stroke="#ffc31a" stroke-width=".6" stroke-linejoin="round"/></svg>`;
 const glyph = (t, col, cls = '') => `<i class="lb-g ${cls}" style="color:${col}">${t}</i>`;
 // 所有の記録がない家電も同じ場所にうすい灰色で出す（どれを確認していないか分かるように）
 const noneBox = t => `<i class="lb-b lb-none">${t}</i>`;
-const box = (t, a, cat) => { if (a.none) return `<i class="lb-b lb-none no">${t}<b class="nx">×</b></i>`; const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}${a.store === '他店' ? ' ta' : ''}${a.nope ? ' no' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}${a.nope ? '<b class="nx">×</b>' : ''}</i>`; };
+const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}${a.store === '他店' ? ' ta' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 function catalogPin(c) {
@@ -1882,11 +1877,11 @@ function catalogPin(c) {
 function labelHTML(c, show, wide) {
   const none = t => wide ? '' : noneBox(t);
   const row0 = [['tv','テ','テレビ'],['aircon','エ','エアコン'],['fridge','冷','冷蔵庫'],['washer','洗','洗濯機']].filter(([k]) => show[k]).map(([k, t, cat]) => {
-    const a = withNope(c, cat); return a ? box(t, a, cat) : none(t);
+    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : none(t);
   }).join('');
   // 2段目: 炊 レ 熱 のあとに 掃 食 ド（追加の家電）
   const row1 = [['rice','炊','炊飯器'],['range','レ','レンジ'],['ih','熱','IH'], ...APPL_EXTRA.map(x => [x.k, x.mark, x.cat])].filter(([k]) => show[k]).map(([k, t, cat]) => {
-    const a = withNope(c, cat); return a ? box(t, a, cat) : none(t);
+    const a = currentAppliance(c, cat); return a ? box(t, a, cat) : none(t);
   }).join('');
   let row2 = '';
   if (show.visit && c.visits.length) {
@@ -1897,14 +1892,13 @@ function labelHTML(c, show, wide) {
   if (c.rfm && c.rfm !== '-') { if (show.rfm) row2 += rankMark(c); }
   else if (show.blank) row2 += c.rfm === '-' ? '<i class="lb-dash"></i>' : '<i class="lb-b lb-sora">空</i>';
   // 給湯器 sits right after the rank
-  if (show.heater) { const a = withNope(c, '給湯器'); row2 += a ? box('湯', a, '給湯器') : none('湯'); }
+  if (show.heater) { const a = currentAppliance(c, '給湯器'); row2 += a ? box('湯', a, '給湯器') : none('湯'); }
   if (show.s && c.rank === 'S') row2 += glyph('S', '#2346f0', 'k');
   let row3 = '';
   if (show.contact) {
     const seen = new Map();
     for (const e of c.events) { const n = STAGE_NO[stageOf(e.kind)]; if (n && !seen.has(n)) seen.set(n, staffColor(e.staff)); }
     row3 = [...seen.keys()].sort().map(n => glyph(stageMark(n), seen.get(n), 'w dg')).join('');
-    if (c.nopeAll) row3 += glyph('×', '#c62828', 'w dg');   // 今は要らない（家電を決めずに）
   }
   let pin = '';
   if (show.catalog) pin = catalogPin(c);
@@ -2023,7 +2017,6 @@ function renderLogoToggles() {
     row(box('炊', { ...dummy, store: '他店' }, '炊飯器'), '右上の白い丸＝他店で買ったもの') +
     row(box('炊', { ...dummy, maru: true }, '炊飯器') + box('炊', { ...fresh, maru: true }, '炊飯器'), '右下の黄色い✓＝下の日付以降に所有を確認') +
     row([1, 2, 3].map(n => glyph(stageMark(n), st('ト'), 'w dg')).join(''), `接点 ${CP_KINDS.map(stageLabel).join('・')}（色は担当）`) +
-    row(box('テ', { ...dummy, nope: true }, 'テレビ') + glyph('×', '#c62828', 'w dg'), '左上の×＝今は要らないと言われた家電（1年間）・×だけ＝家電を決めずに今は要らない') +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
 // dots and 広域 icons shrink as the map zooms out; 中域 icons are the usual size, 詳細 (houses far apart on screen) a quarter bigger
@@ -2229,7 +2222,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
       <div class="blk recblk"><h3>記録をつける</h3>
         <div class="row catrow"><span class="lt">お店誌</span>${CATALOG.seasons.map(s => `<button class="btn sm${s === CATALOG.current ? ' cur' : ''}" type="button" data-rec="${CAT_KIND(s)}">${s}</button>`).join('')}<button class="btn sm" type="button" data-rec="カレンダー">カレンダー</button></div>
         <div class="row"><button class="btn" type="button" data-rec="訪問">訪問した</button><button class="btn" type="button" data-rec="所有確認">新しく見つけた家電</button></div>
-        <div class="row">${CP_KINDS.map(k => `<button class="btn" type="button" data-rec="${k}">${esc(stageLabel(k))}</button>`).join('')}<button class="btn" type="button" data-rec="不要">今は要らない</button></div>
+        <div class="row">${CP_KINDS.map(k => `<button class="btn" type="button" data-rec="${k}">${esc(stageLabel(k))}</button>`).join('')}</div>
         ${recListHTML(c.code)}</div>
       <div class="blk"><h3>家電（所有年数）</h3><div class="appl">${applRows}</div></div>
       <div class="blk"><h3>接点情報（${c.events.length}件）</h3>${hist(c.events, '接点の記録はありません')}</div>
@@ -2598,7 +2591,7 @@ function applyRecords() {
   for (const [code, c] of rHidden) customers.set(code, c);   // ランクRで外していた人も、記録を当て直してから決め直す
   rHidden.clear();
   for (const c of customers.values()) {
-    c.hasRec = false; delete c.nope; delete c.nopeAll;
+    c.hasRec = false;
     c.visits = c.visits.filter(v => !v.fromRec);
     c.events = c.events.filter(v => !v.fromRec);
     for (const k in c.appl) {
@@ -2613,14 +2606,7 @@ function applyRecords() {
     c.hasRec = true;
     const d = r.date ? new Date(r.date + 'T00:00:00') : null;
     if (r.kind === '訪問') c.visits.push({ date: d, staff: r.staff, kind: '訪問', custom: '', fromRec: true });
-    else if (CP_KINDS.includes(r.kind)) {
-      c.events.push({ date: d, staff: r.staff, kind: r.kind, custom: '', fromRec: true });
-      if (r.hope && c.nope) delete c.nope[r.hope === '熱源' ? 'IH' : r.hope];   // あとで見込みになったら×は消す
-    }
-    else if (r.kind === '不要') {   // 今は要らない: 1年間だけ×を出す
-      if (!d || TODAY - d > NOPE_DAYS * 864e5) continue;
-      if (r.nope) (c.nope ||= {})[r.nope === '熱源' ? 'IH' : r.nope] = d; else c.nopeAll = d;
-    }   // 1チラシ・2推進・3見込み
+    else if (CP_KINDS.includes(r.kind)) c.events.push({ date: d, staff: r.staff, kind: r.kind, custom: '', fromRec: true });   // 留守・面会・見込み   // 1チラシ・2推進・3見込み
     else if (catSeasonOf(r)) {
       if (!catCounts(r)) continue;   // ほかの季節・期間外のお店誌は、地図の印には使わない（記録には残る）
       if (!('_cat0' in c)) { c._cat0 = c.catalog; c._ct0 = c.catalogTarget; }
@@ -2656,7 +2642,7 @@ const HOLD_TAG = '<b class="holdtag">保留・製造年を確認</b>';
 function recRedraw() { applyRecords(); refresh(); if (selected) select(selected, false); renderRecState(); }
 /* 今日の動き: 今日（この端末の日付）の記録がある人を、記録した担当者の色の輪で光らせ続ける。押すたびにON/OFF（開くといつもOFF）。
    ONの間は、今日の記録がない人は薄く。右上に担当者ごとの件数（押すとその人の今日の場所へ） */
-const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '不要': '×', '所有確認': '所' } };
+const TODAY_UI = { label: '今日の動き', mark: { 'お店誌': 'お', 'カレンダー': 'カ', '訪問': '訪', 'Aチラシ': '1', 'B推進': '2', 'C見込み': '3', '所有確認': '所' } };
 const todayTag = k => TODAY_UI.mark[k] || TODAY_UI.mark[k.replace(/(春|夏|秋|冬)$/, '')] || k.slice(0, 1);
 let todayOn = false, todayCodes = new Set();
 let todayDay = null;   // 📅で選んだ日（null＝今日）。開くといつも今日
@@ -2712,7 +2698,7 @@ function recListHTML(code) {
     const what = r.kind === '所有確認' ? `${r.status ? '【' + esc(r.status) + '】' : '【新しく見つけた】'}${esc(r.appl)}${r.maker ? '・' + esc(r.maker) : ''}${r.model ? '・' + esc(r.model) : ''}${r.year ? '・' + esc(r.year) + '年製' : ''}${r.dlv ? '・' + esc(r.dlv.replace(/-/g, '/')) + '納品' : ''}${r.place ? '・' + esc(r.place) : ''}${r.store ? '・' + esc(r.store) : ''}` : '';
     const tags = (recHold(r) && !done.has(r.id) ? ' ' + HOLD_TAG : '') + (done.has(r.id) ? ' <b>入力済</b>' : '') + (pend.has(r.id) ? ' <i>未送信</i>' : '');
     const ops = r.writer === writerId ? `<span class="ops"><button type="button" data-redit="${esc(r.id)}">直す</button><button type="button" data-rdel="${esc(r.id)}">消す</button></span>` : '';
-    return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(CP_KINDS.includes(r.kind) ? stageLabel(r.kind) + (r.hope ? '・' + r.hope : '') : r.kind === '不要' ? '今は要らない' + (r.nope ? '・' + r.nope : '') : r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
+    return `<li><span class="d">${esc(r.date.replace(/-/g, '/'))}</span><span class="t">${esc(CP_KINDS.includes(r.kind) ? stageLabel(r.kind) + (r.hope ? '・' + r.hope : '') : r.kind)}・${esc(r.staff)}${what ? '<br>' + what : ''}${r.memo ? '<br>' + esc(r.memo) : ''}${tags}</span>${ops}</li>`;
   }).join('')}</ul>`;
 }
 function renderRecState() {
@@ -2915,7 +2901,6 @@ function openRecForm(kind, code, rec, ex) {
     else if (['pcode', 'maker', 'place'].includes(el.name)) continue;
     else if (v[el.name] != null) el.value = v[el.name];
   }
-  if (v.nope) f.elements.hope.value = v.nope;
   fillProducts(); setChoice('pcode', v.pcode); setChoice('maker', v.maker ?? ''); setChoice('place', v.place ?? '');
   $('#rfOrig').textContent = v.origModel || v.origDate ? `登録済み：${v.appl} ${v.origModel || '（型式なし）'}${v.origDate ? '・' + v.origDate : ''}　違っていれば下で直してください` : '';
   for (const inp of f.querySelectorAll('input[data-date]')) { inp.classList.remove('bad'); inp.setCustomValidity(''); inp.closest('label').querySelector('.dateHint').textContent = ''; }
@@ -2929,8 +2914,7 @@ function showApplFields() {
   const ks = selKinds(), isAppl = ks.includes('所有確認');
   const ex = !!(f.elements.origModel.value || f.elements.origDate.value);   // 店クラウドVに登録済みの家電の確認・変更
   $('#recForm .applOnly').hidden = !isAppl;
-  $('#recForm .hopeOnly').hidden = !ks.includes('C見込み') && !ks.includes('不要');
-  $('#rfHopeTxt').textContent = ks.includes('C見込み') ? '見込みの家電（何の家電の見込みか）' : '今は要らない家電（家電を決めないときは「－」）';
+  $('#recForm .hopeOnly').hidden = !ks.includes('C見込み');
   // 「新しく見つけた家電」を選んだら それだけ、ほかを選んだら「新しく見つけた家電」を隠す。何も選んでいなければ全部出す
   for (const x of $('#rfKind').querySelectorAll('input[name="kind"]'))
     x.closest('label').hidden = ks.length > 0 && (isAppl ? x.value !== '所有確認' : x.value === '所有確認');
@@ -3004,7 +2988,7 @@ $('#recForm form').addEventListener('submit', e => {
   for (const inp of e.target.querySelectorAll('input[data-date]')) if (!checkDay(inp)) { inp.focus(); toast('日付を確かめてください（例 20180223・2018/2/23）', 3500); return; }
   const f = e.target, c = customers.get(recEditing.code);
   const kinds = selKinds();
-  if (!kinds.length) { toast('「お店誌・カレンダー・訪問・所有確認・1〜3・今は要らない」のどれかを選んでください', 3000); return; }
+  if (!kinds.length) { toast('「お店誌・カレンダー・訪問・所有確認・留守・面会・見込み」のどれかを選んでください', 3000); return; }
   for (const kind of kinds) if (CP_KINDS.includes(kind)) {   // 同じ印をもう一度つけようとしていないか
     const st = stageOf(kind), dupRec = [...computeRecords().recs.values()].some(r => r.code === c.code && r.kind === kind && r.id !== recEditing.id);
     const dupV = c.events.some(ev => !ev.fromRec && stageOf(ev.kind) === st && ev.date && isoDay(ev.date) >= STAGE_SINCE);   // 意味が変わる前の店クラウドVの記録は見ない
@@ -3012,10 +2996,10 @@ $('#recForm form').addEventListener('submit', e => {
   }
   if (!kinds.includes('所有確認')) {   // お店誌・訪問・1〜3 などは、選んだ種類ごとに1件ずつ記録（形は今までと同じ）
     const date = f.elements.date.value, staff = f.elements.staff.value, memo = f.elements.memo.value.trim();
-    const hope = kinds.includes('C見込み') || kinds.includes('不要') ? f.elements.hope.value : '';
+    const hope = kinds.includes('C見込み') ? f.elements.hope.value : '';
     if (kinds.includes('C見込み') && !hope && !confirm('何の家電の見込みかが選ばれていません。このまま保存しますか？')) return;
     kinds.forEach((kind, i) => recAdd({ op: 'put', rec: { id: (i === 0 && recEditing.id) || newId(), kind, date, staff, code: c.code, name: c.name,
-      ...(kind === 'C見込み' && hope ? { hope } : kind === '不要' && hope ? { nope: hope } : {}), memo, writer: writerId, at: new Date().toISOString() } }));
+      ...(kind === 'C見込み' && hope ? { hope } : {}), memo, writer: writerId, at: new Date().toISOString() } }));
     lsSet('yame-rec-staff', staff);
     $('#recForm').hidden = true;
     toast(kinds.length > 1 ? `${kinds.length}件 記録しました` : '記録しました', 2000);
@@ -3065,7 +3049,6 @@ $('#recExportGo').addEventListener('click', () => {
     const d = r.date.replace(/-/g, '/');
     if (r.kind === '訪問') return '接点の「訪問」にチェック';
     if (CP_KINDS.includes(r.kind)) return `接点の「${r.kind}」にチェック` + (r.hope ? `・メモに「見込み：${r.hope}」` : '');
-    if (r.kind === '不要') return '接点の「今は要らない」にチェック';
     if (catSeasonOf(r)) { const s = catSeasonOf(r); return `接点の「お店誌${s}（旧 特選品${s}）」にチェック`; }
     if (r.kind === 'カレンダー') return '接点の「カレンダ」にチェック';
     if (r.status === '処分済み') return `元の所有を「廃棄」・廃棄日付 ${d}`;
@@ -3074,7 +3057,7 @@ $('#recExportGo').addEventListener('click', () => {
     return `所有を新規登録（${r.store === '他店' ? `他店・納品日 ${r.year ? r.year + '/01/01' : '製造年の1/1'}` : r.store || '自店か他店か確認'}）・廃棄日付 ${d}`;
   };
   const lines = [head.join(',')].concat(rows.map(r => [r.date.replace(/-/g, '/'), r.code, r.name, r.staff, r.kind,
-    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl || r.hope || r.nope, r.status ? '' : r.pcode, r.maker, r.model, r.year, (r.dlv || '').replace(/-/g, '/'), r.place, r.store,
+    r.kind === '所有確認' ? (r.status ? '既存の確認' : '新しく見つけた') : '', r.status || '', r.appl || r.hope, r.status ? '' : r.pcode, r.maker, r.model, r.year, (r.dlv || '').replace(/-/g, '/'), r.place, r.store,
     r.origModel, r.origDate, r.kind === '所有確認' && (!r.status || r.status === '使用中') ? r.date.replace(/-/g, '/') : '',
     todo(r), r.memo, r.id, done.has(r.id) ? '済' : ''].map(q).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' });
@@ -3209,11 +3192,11 @@ const cpDue = (c, cp) => cp.cats.some(cat => { const a = currentAppliance(c, cat
 // one customer's activity in [from, to] (YYYY-MM-DD). 店クラウドVの接点と地図の記録は、同じ日・同じ種類なら1回と数える
 const SUM_ROWS = [
   { k: '訪問', label: '訪問' }, { k: 'お店誌', label: 'お店誌' }, { k: 'カレンダー', label: 'カレンダー' }, { k: 'チラシ', label: 'Aチラシ' }, { k: '推進', label: 'B推進' },
-  { k: '見込み', label: 'C見込み' }, { k: '不要', label: '今は要らない' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
+  { k: '見込み', label: 'C見込み' }, { k: '所有確認', label: '所有確認' }, { k: '新規家電', label: '新しく見つけた家電' },
 ];
 const SUM_STAFF = [...STAFF];
-const STAGE_ROW = new Set(['チラシ', '推進', '見込み', '不要']);
-const histKind = k => /不要|要らない/.test(k) ? '不要' : /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進|面会/.test(k) ? '推進' : /チラシ|留守/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
+const STAGE_ROW = new Set(['チラシ', '推進', '見込み']);
+const histKind = k => /訪問/.test(k) ? '訪問' : /見込/.test(k) ? '見込み' : /推進|面会/.test(k) ? '推進' : /チラシ|留守/.test(k) ? 'チラシ' : /所有確認/.test(k) ? '所有確認' : /お店誌|特選品/.test(k) ? 'お店誌' : /カレンダ/.test(k) ? 'カレンダー' : '';
 const hasHist = () => [...customers.values()].some(c => c.hist && c.hist.length);
 const lastYear = d => addMonths(d, -12);
 function activityIn(from, to) {
@@ -3234,7 +3217,6 @@ function activityIn(from, to) {
     if (!customers.has(r.code)) continue;
     if (catSeasonOf(r)) push(r.code, 'お店誌', r.date, r.staff);
     else if (r.kind === 'カレンダー') push(r.code, 'カレンダー', r.date, r.staff);
-    else if (r.kind === '不要') push(r.code, '不要', r.date, r.staff);
     else if (r.kind === '所有確認') {
       const ex = !!(r.origModel || r.origDate);
       push(r.code, ex ? '所有確認' : '新規家電', r.date, r.staff, (r.appl === '熱源' ? 'IH' : r.appl) + (ex ? r.origModel || '' : r.model || ''));
