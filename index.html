@@ -801,6 +801,9 @@ details.more .row{margin-top:6px}
 .lb-pin.cs b{font-size:12px;line-height:1;font-weight:900;font-family:"Hiragino Sans","BIZ UDPGothic",sans-serif}
 .lb-early{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2.5px dashed #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000;pointer-events:none}
 .catline{font-size:12px;color:var(--muted);margin-top:4px}.catline.early{color:#b45309;font-weight:700}
+/* 顧客コードの右: これまでの購入金額の順位と金額（円マークなし） */
+#card .code .amt{margin-left:12px;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink)}
+#card .code .amt b{margin-right:8px}
 .kearly{display:inline-block;width:18px;height:18px;border-radius:50%;border:2.5px dashed #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000;background:#cfd8dc}
 .lb-left{position:absolute;right:12px;top:-43px;display:grid;grid-template-rows:16px 16px 16px 16px;row-gap:2px;justify-items:start}   /* 段の間をあけて、隣の印どうしが重ならないように */
 /* only the visible marks take taps: the empty space of the icon block used to cover the neighbour's name */
@@ -1292,6 +1295,7 @@ function ingest(rows, fileName) {
     if (!c) { c = { code, name:'', addr:'', addr2:'', lat:null, lng:null, rank:'', rfm:'', events:[], visits:[], appl:{}, keys:new Set() }; customers.set(code, c); }
     if (!enrichOnly) c.listed = true;   // on ② お店誌 or a ⑥⑦ list (decides whether a ランクR customer is shown)
     if (row._rOk) c.rOk = true;         // 地図用データ.json: ランクRだが接点ありで表示
+    if (row._amt != null && row._amt !== '') { c.amount = +row._amt || 0; c.amountRank = +row._amtRank || 0; }   // これまでの購入金額と順位
     if (row._act) applyActivity(c, row._act);
     const name =pick(row, ['顧客名称', '顧客名', '氏名']); if (name) c.name = String(name).trim();
     // RFM files carry the address in 結合済み instead of 住所
@@ -1454,7 +1458,8 @@ function jsonToRows(d) {
   if (Date.parse(d['作成日時'])) jsonSrc['作成日時'] = Date.parse(d['作成日時']);
   return d['顧客'].map(p => {
     const row = { 顧客コード: p['顧客コード'], 顧客名称: p['顧客名称'], 住所: p['住所'], 座標: p['座標'], 緯度: p['緯度'], 経度: p['経度'],
-      顧客ランク区分: p.rank, RFMランク区分: p['RFMランク区分'], _rOk: !!p['ランクRだが接点ありで表示'], _act: p['活動'] || null };
+      顧客ランク区分: p.rank, RFMランク区分: p['RFMランク区分'], _rOk: !!p['ランクRだが接点ありで表示'], _act: p['活動'] || null,
+      _amt: p['購入金額'], _amtRank: p['購入金額順位'] };
     for (const [name, a] of Object.entries(p['家電'] || {})) {
       for (const k of ['台数', '自店', '他店']) if (a[k] != null) row[name + k] = a[k];
       (a['一覧'] || []).forEach((u, i) => {
@@ -2275,7 +2280,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
   const q = c.lat != null ? `${c.lat},${c.lng}` : encodeURIComponent(c.addr);
   $('#card').innerHTML = `<div class="grab" title="上下に引っぱって大きさを変えられます"><i></i></div>
-    <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}</div>
+    <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}${c.amount != null ? `<span class="amt">${c.amountRank ? `<b>${c.amountRank.toLocaleString()}位</b>` : ''}${Math.round(c.amount).toLocaleString()}</span>` : ''}</div>
       <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff ? '最近接点者 ' + c.staff : '未接点')}${badge('stage', c.vals.stage)}${badge('visit', c.vals.visit)}</div>${catLine(c)}</div>
       <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
     <div class="bd">
