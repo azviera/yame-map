@@ -2220,6 +2220,14 @@ function renderDataState() {
 }
 
 /* ---------- customer card ---------- */
+// 顧客コードの右: これまでの購入金額（税抜・円マークなし）と、その順位（ランクRの人は順位なし）。
+// 地図用データ.json に購入金額が入っていれば、売上のない人（値なし）も「0」と出す。入っていない古いデータでは何も出さない
+function amountHTML(c) {
+  let any = false; for (const x of customers.values()) if (x.amount != null) { any = true; break; }
+  if (!any) return '';
+  const amt = Math.round(c.amount || 0), rank = c.amountRank && c.rank !== 'R' ? c.amountRank : 0;
+  return `<span class="amt">${rank ? `<b>${rank.toLocaleString()}位</b>` : ''}${amt.toLocaleString()}</span>`;
+}
 // カードのお店誌の行: 今の号の様子（渡した季節・担当）と、最後に渡した日・何日前か（まだ早いか）
 // 季節ごとに、このお客様へ最後に配った号の年（{秋: 2026, 春: 2025 …}）。店クラウドVの接点（履歴）・地図用データ.json の 渡した・地図アプリの記録から。
 // 冬号は12月〜2月にまたがるので、1・2月に渡した冬号は前の年の号として数える（配り始めの年）
@@ -2283,7 +2291,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
     `<li><span class="d">${fmtDate(e.date) || '日付なし'}</span><span>${esc(e.kind)}${e.staff ? '・' + esc(e.staff) : ''}</span></li>`).join('')}</ul>` : `<div class="empty">${empty}</div>`;
   const q = c.lat != null ? `${c.lat},${c.lng}` : encodeURIComponent(c.addr);
   $('#card').innerHTML = `<div class="grab" title="上下に引っぱって大きさを変えられます"><i></i></div>
-    <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}${c.amount != null ? `<span class="amt">${c.amountRank ? `<b>${c.amountRank.toLocaleString()}位</b>` : ''}${Math.round(c.amount).toLocaleString()}</span>` : ''}</div>
+    <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}${amountHTML(c)}</div>
       <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff ? '最近接点者 ' + c.staff : '未接点')}${badge('stage', c.vals.stage)}${badge('visit', c.vals.visit)}</div>${catLine(c)}</div>
       <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
     <div class="bd">
