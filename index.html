@@ -2490,10 +2490,12 @@ let odSettings = {};   // 地図の設定.json の中身（保存するときに
 // お店誌の今の季節・期間（地図の設定.json の "お店誌"）。変わったら地図の印を当て直す
 function applyCatalogSettings(o) {
   if (!o) return;
-  const cur = CATALOG.seasons.includes(o['今の季節']) ? o['今の季節'] : CATALOG.current;
-  const from = /^\d{4}-\d{2}-\d{2}$/.test(o['開始日'] || '') ? o['開始日'] : CATALOG.from, to = /^\d{4}-\d{2}-\d{2}$/.test(o['終了日'] || '') ? o['終了日'] : CATALOG.to;
-  if (cur === CATALOG.current && from === CATALOG.from && to === CATALOG.to) return;
-  Object.assign(CATALOG, { current: cur, from, to });
+  const b = catBase;
+  const cur = CATALOG.seasons.includes(o['今の季節']) ? o['今の季節'] : b.current;
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(o['開始日'] || '') ? o['開始日'] : b.from, to = /^\d{4}-\d{2}-\d{2}$/.test(o['終了日'] || '') ? o['終了日'] : b.to;
+  const auto = o['自動'] !== false;
+  if (cur === b.current && from === b.from && to === b.to && auto === CATALOG.auto) return;
+  catBase = { current: cur, from, to }; CATALOG.auto = auto;
   if (customers.size) recRedraw();
 }
 async function odSaveSettings() {
@@ -2581,11 +2583,28 @@ function computeRecords() {
   return { recs, done };
 }
 /* お店誌は季節ごとの号（記録の種類は お店誌春・お店誌夏・お店誌秋・お店誌冬）。地図の●★は「今配っている季節」の記録で決める。
-   今の季節と期間は「地図の設定.json」の "お店誌": {"今の季節": "秋", "開始日": "2026-09-02", "終了日": "2026-11-30"} で変えられる（ここは初めの値） */
-const CATALOG = { seasons: ['春', '夏', '秋', '冬'], current: '秋', from: '2026-09-02', to: '2026-11-30' };
+   今の季節は記録から自動で決める（autoCatalog）。記録がまだ足りないときは「地図の設定.json」の
+   "お店誌": {"今の季節": "秋", "開始日": "2026-09-02", "終了日": "2026-11-30"} の値（ここは初めの値）。"自動": false なら設定どおり */
+const CATALOG = { seasons: ['春', '夏', '秋', '冬'], current: '秋', from: '2026-09-02', to: '2026-11-30', auto: true };
+let catBase = { current: CATALOG.current, from: CATALOG.from, to: CATALOG.to };
+// 今の季節 = 最近180日に3軒以上へ渡した季節のうち、配り始め（その季節の最初の日）がいちばん新しいもの。
+// 新しい季節のボタンを押し始めると、3軒目でその季節に切り替わる（終わりの日は決めない。次の季節が始まるまで）
+const CAT_AUTO = { days: 180, min: 3 };
+function autoCatalog(recs) {
+  let next = catBase;
+  if (CATALOG.auto) {
+    const since = isoDay(new Date(Date.now() - CAT_AUTO.days * 864e5)), seen = {};
+    const add = (s, code, day) => { if (!s || !day || day < since) return; const o = (seen[s] ||= { codes: new Set(), first: day }); o.codes.add(code); if (day < o.first) o.first = day; };
+    for (const r of recs.values()) if (r.kind !== 'お店誌') add(catSeasonOf(r), r.code, r.date);   // 地図の記録
+    for (const c of customers.values()) for (const e of c.hist || []) add((e.kind.match(/(?:お店誌|特選品)(春|夏|秋|冬)/) || [])[1], c.code, e.day);   // 店クラウドVの接点
+    const best = Object.entries(seen).filter(([, o]) => o.codes.size >= CAT_AUTO.min).sort((a, b) => (a[1].first < b[1].first ? 1 : -1))[0];
+    if (best) next = { current: best[0], from: best[1].first, to: '' };
+  }
+  Object.assign(CATALOG, next);
+}
 const CAT_KIND = s => 'お店誌' + s;
 const catSeasonOf = r => r.kind === 'お店誌' ? CATALOG.current : (r.kind.match(/^お店誌(春|夏|秋|冬)$/) || [])[1] || '';   // 'お店誌' は季節を分ける前の記録
-const catCounts = r => catSeasonOf(r) === CATALOG.current && (!r.date || (r.date >= CATALOG.from && r.date <= CATALOG.to));
+const catCounts = r => catSeasonOf(r) === CATALOG.current && (!r.date || (r.date >= CATALOG.from && (!CATALOG.to || r.date <= CATALOG.to)));
 // put the records onto the customers (undoing what an earlier pass added first)
 function applyRecords() {
   for (const [code, c] of rHidden) customers.set(code, c);   // ランクRで外していた人も、記録を当て直してから決め直す
@@ -2601,6 +2620,7 @@ function applyRecords() {
     if ('_cat0' in c) { c.catalog = c._cat0; c.catalogTarget = c._ct0; delete c._cat0; delete c._ct0; }
   }
   const { recs } = computeRecords();
+  autoCatalog(recs);   // お店誌の今の季節（新しい季節を配り始めたら切り替わる）
   for (const r of [...recs.values()].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const c = customers.get(r.code); if (!c) continue;
     c.hasRec = true;
@@ -3245,7 +3265,7 @@ const diffTag = (now, before) => now === before ? '' : `<span class="df ${now > 
 let sumPeriod = 'cat';
 function sumRange() {
   const t = isoDay(new Date());
-  if (sumPeriod === 'cat') return { from: CATALOG.from, to: CATALOG.to, label: `お店誌${CATALOG.current}の期間` };
+  if (sumPeriod === 'cat') return { from: CATALOG.from, to: CATALOG.to || t, label: `お店誌${CATALOG.current}の期間` };
   if (sumPeriod === 'month') return { from: t.slice(0, 8) + '01', to: t, label: '今月' };
   if (sumPeriod === 'week') { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return { from: isoDay(d), to: t, label: '今週（月曜から）' }; }
   if (sumPeriod === 'free') { const f = $('#sumFrom').value || t, to = $('#sumTo').value || t; return { from: f <= to ? f : to, to: f <= to ? to : f, label: '指定した期間' }; }
