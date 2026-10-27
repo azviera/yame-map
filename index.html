@@ -791,6 +791,12 @@ details.more .row{margin-top:6px}
 .lab::before{content:"";position:absolute;left:calc(-18px / var(--s,1));top:calc(-18px / var(--s,1));width:calc(36px / var(--s,1));height:calc(36px / var(--s,1));border-radius:50%}
 .lb-pin{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.7);background:var(--c)}.lb-star{position:absolute;left:-11px;top:-11px;width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.7)}   /* 色の丸と同じ外径 */
 .lab.sel .lb-star,.lab.sel .lb-pin{outline:3px solid var(--ink);outline-offset:2px}
+/* お店誌の●の中の季節の字（春夏秋冬）と、前の号を渡してまだ日が浅い人の点線の輪 */
+.lb-pin.cs{display:flex;align-items:center;justify-content:center}
+.lb-pin.cs b{font-size:12px;line-height:1;font-weight:900;font-family:"Hiragino Sans","BIZ UDPGothic",sans-serif}
+.lb-early{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2.5px dashed #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000;pointer-events:none}
+.catline{font-size:12px;color:var(--muted);margin-top:4px}.catline.early{color:#b45309;font-weight:700}
+.kearly{display:inline-block;width:18px;height:18px;border-radius:50%;border:2.5px dashed #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000;background:#cfd8dc}
 .lb-left{position:absolute;right:12px;top:-43px;display:grid;grid-template-rows:16px 16px 16px 16px;row-gap:2px;justify-items:start}   /* 段の間をあけて、隣の印どうしが重ならないように */
 /* only the visible marks take taps: the empty space of the icon block used to cover the neighbour's name */
 .lb-left,.lb-left .r{pointer-events:none}.lb-left i,.lb-left svg{pointer-events:auto}
@@ -1455,6 +1461,7 @@ function jsonToRows(d) {
     return row;
   });
 }
+const seasonOfKind = k => (String(k || '').match(/(?:お店誌|特選品)\s*(春|夏|秋|冬)/) || [])[1] || '';
 const jsonHasActivity = d => Array.isArray(d && d['顧客']) && d['顧客'].some(p => p && p['活動']);
 // 「活動」: お店誌（予定・渡した）、チラシ（Aチラシ・B推進・C見込み）、訪問。②⑥⑦ の行と同じものを作る
 function applyActivity(c, act) {
@@ -1462,6 +1469,10 @@ function applyActivity(c, act) {
   if (cat['予定'] || (cat['渡した'] || []).length) c.catalogTarget = true;
   const sent = (cat['渡した'] || []).map(e => staffAlias(e['担当'])).find(Boolean);
   if (sent) c.catalog = sent;
+  // 渡したお店誌の季節と日（●の中の文字・「まだ早い」の判定に使う）。渡した は新しい順
+  c.catSent = (cat['渡した'] || []).map(e => ({ day: String(e['日付'] || '').slice(0, 10).replace(/\//g, '-'), season: seasonOfKind(e['種類']), staff: staffAlias(e['担当']) }))
+    .filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.day));
+  if (sent && c.catSent.length) c.catSeason = c.catSent[0].season;
   const add = (list, isVisit) => { for (const e of list || []) {
     const date = parseDate(e['日付']), staff = staffAlias(e['担当']), kind = isVisit ? '訪問' : String(e['種類'] || '');
     const key = [isVisit ? 'v' : 'e', fmtDate(date), staff, kind].join('|');
@@ -1868,10 +1879,15 @@ const noneBox = t => `<i class="lb-b lb-none">${t}</i>`;
 const box = (t, a, cat) => { const col = ageCol(cat, a); return `<i class="lb-b${isMaru(a) ? ' maru' : ''}${a.store === '他店' ? ' ta' : ''}" style="background-color:${col};color:${col === OVER ? '#000' : '#fff'}">${t}</i>`; };
 // お店誌: pin in the staff colour when sent
 const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
-function catalogPin(c) {
-  if (c.catalog) return `<span class="lb-pin" style="--c:${staffColor(c.catalog)}"></span>`;
-  if (c.catalogTarget) return STAR;   // on the お店誌 list (RFM A) but not sent yet
-  return '';                          // not a お店誌 target: no mark
+// 中域・詳細では●の中に渡した季節の1文字（広域は丸が小さいので色だけ）。前のお店誌を渡してまだ日が浅い人は、外側に点線の輪（まだ早い）
+function catalogPin(c, wide) {
+  const early = catTooSoon(c) ? '<span class="lb-early"></span>' : '';
+  if (c.catalog) {
+    const col = staffColor(c.catalog), s = !wide && c.catSeason ? `<b style="color:${inkOn(col)}">${esc(c.catSeason)}</b>` : '';
+    return early + `<span class="lb-pin${s ? ' cs' : ''}" style="--c:${col}">${s}</span>`;
+  }
+  if (c.catalogTarget) return early + STAR;   // on the お店誌 list (RFM A) but not sent yet
+  return early;                               // not a お店誌 target: no mark
 }
 // show: which logos to draw. wide (引いた地図): appliances not on record are left out instead of greyed, to keep it light
 function labelHTML(c, show, wide) {
@@ -1901,7 +1917,7 @@ function labelHTML(c, show, wide) {
     row3 = [...seen.keys()].sort().map(n => glyph(stageMark(n), seen.get(n), 'w dg')).join('');
   }
   let pin = '';
-  if (show.catalog) pin = catalogPin(c);
+  if (show.catalog) pin = catalogPin(c, wide);
   else pin = `<span class="lb-pin${isRing(dim, c.vals[dim]) ? ' ring' : ''}" style="--c:${colorOf(dim, c.vals[dim])}"></span>`;
   const name = show.name ? `<span class="lb-name">${esc(c.name || c.code)}</span>` : '';
   return `<div class="lab${selected === c.code ? ' sel' : ''}" data-code="${esc(c.code)}"><div class="lb-left"><div class="r">${row0}</div><div class="r">${row1}</div><div class="r">${row2}</div><div class="r">${row3}</div></div>${pin}${name}</div>`;
@@ -1999,7 +2015,10 @@ function renderLogoToggles() {
   const st = n => staffColor(n);
   const row = (ic, txt) => `<div class="keyrow"><span class="ic">${ic}</span><span>${txt}</span></div>`;
   const dummy = { date: new Date(TODAY.getFullYear() - 20, 0, 1) }, fresh = { date: TODAY };
+  const csPin = (s, who) => `<span class="kpin" style="background:${st(who)};color:${inkOn(st(who))};width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900">${s}</span>`;
   $('#logoKey').innerHTML =
+    row(csPin('秋', 'ト') + csPin('冬', 'テ'), 'お店誌を渡した（丸の色＝渡した担当・中の字＝渡した季節。中域・詳細で表示）') +
+    row('<span class="kearly"></span>', `点線の輪＝前のお店誌を渡して${CAT_GAP_DAYS}日以内（次の号はまだ早い）`) +
     row(['A','B','C','D','E'].map(v => glyph(v, DIMS.rfm.colors[v], 'k')).join(''), 'RFMランク') +
     row(glyph('S', '#2346f0', 'k'), '顧客ランクS') +
     row('<i class="lb-dash"></i><i class="lb-b lb-sora">空</i>', 'RFMが「-」／データなし') +
@@ -2169,6 +2188,15 @@ function renderDataState() {
 }
 
 /* ---------- customer card ---------- */
+// カードのお店誌の行: 今の号の様子（渡した季節・担当）と、最後に渡した日・何日前か（まだ早いか）
+function catLine(c) {
+  const parts = [];
+  if (c.catalog) parts.push(`お店誌 ${c.catSeason || ''} ${c.catalog}`.replace(/\s+/g, ' '));
+  else if (c.catalogTarget) parts.push(`お店誌 ${CATALOG.current}：まだ（★）`);
+  const l = lastCatalog(c);
+  if (l) { const n = daysSince(l.day); parts.push(`${l.season || ''}を${+l.day.slice(5, 7)}/${+l.day.slice(8, 10)}に渡した（${n}日前${n <= CAT_GAP_DAYS ? '・まだ早い' : ''}）`); }
+  return parts.length ? `<div class="catline${l && daysSince(l.day) <= CAT_GAP_DAYS ? ' early' : ''}">${esc(parts.join('　'))}</div>` : '';
+}
 function select(code, pan, stay) {   // stay: redraw the open card without moving the map
   selected = code;
   const c = customers.get(code); if (!c) return;
@@ -2213,7 +2241,7 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
   const q = c.lat != null ? `${c.lat},${c.lng}` : encodeURIComponent(c.addr);
   $('#card').innerHTML = `<div class="grab" title="上下に引っぱって大きさを変えられます"><i></i></div>
     <div class="hd"><div class="who"><div class="nm">${esc(c.name || '（名称なし）')}</div><div class="code">顧客コード ${esc(c.code)}</div>
-      <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff ? '最近接点者 ' + c.staff : '未接点')}${badge('stage', c.vals.stage)}${badge('visit', c.vals.visit)}</div></div>
+      <div class="badges">${badge('rank', '顧客ランク ' + (c.rank || '－'))}${badge('rfm', 'RFM ' + (c.rfm || '－'))}${badge('staff', c.staff ? '最近接点者 ' + c.staff : '未接点')}${badge('stage', c.vals.stage)}${badge('visit', c.vals.visit)}</div>${catLine(c)}</div>
       <button class="x" type="button" id="closeCard" aria-label="閉じる">×</button></div>
     <div class="bd">
       <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.tels && c.tels.size ? `<div class="empty">電話 ${[...c.tels].map(t => `<a href="tel:${esc(t)}">${esc(t)}</a>`).join('・')}</div>` : ''}${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
@@ -2491,6 +2519,7 @@ let odSettings = {};   // 地図の設定.json の中身（保存するときに
 function applyCatalogSettings(o) {
   if (!o) return;
   const b = catBase;
+  if (+o['間をあける日数'] > 0 && +o['間をあける日数'] !== CAT_GAP_DAYS) { CAT_GAP_DAYS = +o['間をあける日数']; if (customers.size) refresh(); }
   const cur = CATALOG.seasons.includes(o['今の季節']) ? o['今の季節'] : b.current;
   const from = /^\d{4}-\d{2}-\d{2}$/.test(o['開始日'] || '') ? o['開始日'] : b.from, to = /^\d{4}-\d{2}-\d{2}$/.test(o['終了日'] || '') ? o['終了日'] : b.to;
   const auto = o['自動'] !== false;
@@ -2603,6 +2632,21 @@ function autoCatalog(recs) {
   Object.assign(CATALOG, next);
 }
 const CAT_KIND = s => 'お店誌' + s;
+// 前のお店誌を渡してまだ日が浅い人（次の号を持っていくには早い）: 何日以内か。地図の設定.json の "お店誌": {"間をあける日数": 30} で変えられる
+let CAT_GAP_DAYS = 30;
+// 最後にお店誌（どの季節でも）を渡した日: 地図アプリの記録・地図用データ.json の 渡した・店クラウドVの接点（履歴）のいちばん新しいもの
+function lastCatalog(c) {
+  let best = c.recCatLast || null;
+  const take = e => { if (e && e.day && (!best || e.day > best.day)) best = e; };
+  for (const e of c.catSent || []) take(e);
+  for (const e of c.hist || []) { const s = seasonOfKind(e.kind); if (s) take({ day: e.day, season: s, staff: e.staff }); }
+  return best;
+}
+const daysSince = day => Math.floor((Date.parse(isoDay(new Date()) + 'T00:00:00') - Date.parse(day + 'T00:00:00')) / 864e5);
+const catTooSoon = c => { const l = lastCatalog(c); return l && daysSince(l.day) <= CAT_GAP_DAYS ? l : null; };
+// ●の中の季節の字の色: 丸の色が暗ければ白、明るければ黒
+const inkOn = hex => { const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex || ''); if (!m) return '#fff';
+  const [r, g, b] = m.slice(1).map(x => parseInt(x, 16)); return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#000' : '#fff'; };
 const catSeasonOf = r => r.kind === 'お店誌' ? CATALOG.current : (r.kind.match(/^お店誌(春|夏|秋|冬)$/) || [])[1] || '';   // 'お店誌' は季節を分ける前の記録
 const catCounts = r => catSeasonOf(r) === CATALOG.current && (!r.date || (r.date >= CATALOG.from && (!CATALOG.to || r.date <= CATALOG.to)));
 // put the records onto the customers (undoing what an earlier pass added first)
@@ -2617,7 +2661,8 @@ function applyRecords() {
       c.appl[k] = c.appl[k].filter(a => !a.fromRec);
       for (const a of c.appl[k]) { if (a._o) Object.assign(a, a._o); delete a._o; delete a.recChecked; delete a.recGone; }
     }
-    if ('_cat0' in c) { c.catalog = c._cat0; c.catalogTarget = c._ct0; delete c._cat0; delete c._ct0; }
+    if ('_cat0' in c) { c.catalog = c._cat0; c.catalogTarget = c._ct0; c.catSeason = c._cs0; delete c._cat0; delete c._ct0; delete c._cs0; }
+    c.recCatLast = null;
   }
   const { recs } = computeRecords();
   autoCatalog(recs);   // お店誌の今の季節（新しい季節を配り始めたら切り替わる）
@@ -2628,9 +2673,10 @@ function applyRecords() {
     if (r.kind === '訪問') c.visits.push({ date: d, staff: r.staff, kind: '訪問', custom: '', fromRec: true });
     else if (CP_KINDS.includes(r.kind)) c.events.push({ date: d, staff: r.staff, kind: r.kind, custom: '', fromRec: true });   // 留守・面会・見込み   // 1チラシ・2推進・3見込み
     else if (catSeasonOf(r)) {
+      if (r.date && (!c.recCatLast || r.date >= c.recCatLast.day)) c.recCatLast = { day: r.date, season: catSeasonOf(r), staff: r.staff };   // どの季節でも「最後に渡した日」
       if (!catCounts(r)) continue;   // ほかの季節・期間外のお店誌は、地図の印には使わない（記録には残る）
-      if (!('_cat0' in c)) { c._cat0 = c.catalog; c._ct0 = c.catalogTarget; }
-      c.catalog = r.staff; c.catalogTarget = true;
+      if (!('_cat0' in c)) { c._cat0 = c.catalog; c._ct0 = c.catalogTarget; c._cs0 = c.catSeason; }
+      c.catalog = r.staff; c.catalogTarget = true; c.catSeason = catSeasonOf(r);
     } else if (r.kind === '所有確認') {
       const cat = r.appl === '熱源' ? 'IH' : r.appl;
       const list = (c.appl[cat] ||= []);
