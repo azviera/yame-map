@@ -791,6 +791,8 @@ details.more .row{margin-top:6px}
 
 /* house labels (zoomed in): logos left of the pin, name to the right, like the My Maps layers */
 .lab-wrap{background:none;border:none}
+.leaflet-tooltip.nametip{padding:5px 10px;font-size:14px;font-weight:700;border-radius:8px;cursor:pointer;white-space:nowrap}
+.nametip .nt-code{margin-left:6px;font-weight:400;font-size:12px;opacity:.7}.nametip .nt-go{margin-left:6px;opacity:.6}
 .lab{position:relative;width:0;height:0;cursor:pointer;transform:scale(var(--s,1));transform-origin:0 0}
 /* invisible, finger-sized tap area around the pin (the pin itself is small once the icons are scaled down) */
 .lab::before{content:"";position:absolute;left:calc(-18px / var(--s,1));top:calc(-18px / var(--s,1));width:calc(36px / var(--s,1));height:calc(36px / var(--s,1));border-radius:50%}
@@ -2022,7 +2024,7 @@ function renderLabels() {
     if (++n > (full ? 800 : 3000)) break;
     L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'lab-wrap' + (todayOn && !todayCodes.has(c.code) ? ' dim' : ''), html: labelHTML(c, flags, !full), iconSize: [0, 0] }),
       zIndexOffset: selected === c.code ? 2000 : c.rank === 'S' ? 500 : 0, keyboard: false })
-      .on('click', ev => { L.DomEvent.stopPropagation(ev); select(pickLabel(ev.originalEvent, c.code), false); }).addTo(labelLayer);
+      .on('click', ev => { L.DomEvent.stopPropagation(ev); if (!full) return wideTap(map.mouseEventToContainerPoint(ev.originalEvent)); select(pickLabel(ev.originalEvent, c.code), false); }).addTo(labelLayer);
   }
 }
 // houses close together overlap, and the opened one is drawn on top; tapping it again opens the one underneath
@@ -2153,14 +2155,40 @@ function rebuild(fit) {
   for (const c of customers.values()) {
     if (c.lat == null) continue;
     const m = L.circleMarker([c.lat, c.lng], styleFor(c));
-    m.on('click', () => select(c.code, false));
-    m.bindTooltip(esc(c.name || c.code), { direction: 'top', offset: [0, -6] });
+    m.on('click', e => zoneOf() === 'wide' ? wideTap(e.containerPoint) : select(c.code, false));
+    if (!L.Browser.mobile) m.bindTooltip(esc(c.name || c.code), { direction: 'top', offset: [0, -6] });
     markers.set(c.code, m);
   }
   selected = null; $('#card').hidden = true;
   renderDataState(); renderLogoToggles(); refresh();
   if (fit) fitAll();
 }
+// 広域：ピンを押すと名前の吹き出しだけ出す（地図は動かさない）。小さい点でも押せるように、指の周り20px以内でいちばん近い人を選ぶ。
+// 吹き出しを押すと今までどおり詳細カード。別の所を押す・地図を動かすと消える
+const WIDE_HIT = 20;
+let nameTip = null;
+function wideTap(pt) {
+  let best = null, bd = WIDE_HIT * WIDE_HIT;
+  for (const c of customers.values()) {
+    if (c.lat == null || !passes(c)) continue;
+    const q = map.latLngToContainerPoint([c.lat, c.lng]), d = (q.x - pt.x) ** 2 + (q.y - pt.y) ** 2;
+    if (d < bd) { bd = d; best = c; }
+  }
+  if (best) showNameTip(best); else hideNameTip();
+}
+function hideNameTip() { if (nameTip) { map.removeLayer(nameTip); nameTip = null; } }
+function showNameTip(c) {
+  if (nameTip && nameTip.code === c.code) return;
+  hideNameTip();
+  nameTip = L.tooltip({ permanent: true, direction: 'top', offset: [0, -10], className: 'nametip', interactive: true })
+    .setLatLng([c.lat, c.lng]).setContent(`${esc(c.name || '名前なし')}<span class="nt-code">${esc(c.code)}</span><span class="nt-go">›</span>`).addTo(map);
+  nameTip.code = c.code;
+  const el = nameTip.getElement();
+  L.DomEvent.disableClickPropagation(el);
+  L.DomEvent.on(el, 'click', () => { hideNameTip(); select(c.code, true); });
+}
+map.on('click', e => { if (zoneOf() === 'wide') wideTap(e.containerPoint); else hideNameTip(); });
+map.on('movestart zoomstart', hideNameTip);
 function refresh() {
   let shown = 0;
   const icons = iconMode(), catOnly = catOnlyWide();
