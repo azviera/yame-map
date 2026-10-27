@@ -3364,7 +3364,7 @@ function salesIn(from, to, cats) {
 const pct = (n, d) => d ? `${Math.round(n / d * 1000) / 10}%` : '–';
 const diffTag = (now, before) => now === before ? '' : `<span class="df ${now > before ? 'up' : 'dn'}">${now > before ? '+' : ''}${now - before}</span>`;
 let sumPeriod = 'cat';
-// 所有の確認: 家電ごとに、今その家電を持っていると確かめた家（店クラウドVの廃棄日付の確認日・地図の確認・変更・新しく見つけた家電）
+// 所有の確認: 家電ごとに、今その家電を持っているとわかっている家（自店で販売・店クラウドVの廃棄日付の確認日・地図の確認・変更・新しく見つけた家電）
 // OWN_SINCE より後に確かめた家を「増えた」とする。地図の設定.json の "所有確認の基準日" で変えられる
 let OWN_SINCE = '2026-03-31';
 function ownConfirmed() {
@@ -3374,7 +3374,8 @@ function ownConfirmed() {
     let last = '';
     for (const a of list) {
       if (a.recGone) continue;   // 処分・譲渡したもの
-      for (const d of [a.checked, a.recChecked]) if (d) { const s = isoDay(d); if (s > last) last = s; }
+      const own = !a.fromRec && a.store !== '他店' ? a.date : null;   // 自店で売った家電は、納品日から持っているとみなす
+      for (const d of [a.checked, a.recChecked, own]) if (d) { const s = isoDay(d); if (s > last) last = s; }
     }
     if (!last) continue;
     const o = out.get(cat) || out.set(cat, { now: 0, since: 0 }).get(cat);
@@ -3434,8 +3435,8 @@ function renderSummary() {
   // 所有の確認（期間に関係なく、今の状態）
   const own = ownConfirmed();
   const ownHTML = `<h4>所有の確認（家電ごと・今の状態）</h4>
-    <div class="sumwrap"><table class="sumt"><tr><th>家電</th><th>${fmtY(OWN_SINCE)}から増えた（軒）</th><th>今、確認できている（軒）</th><th>お客様の%</th></tr>${[...own].map(([cat, o]) => `<tr><th>${esc(catName(cat))}</th><td>${o.since}</td><td class="b">${o.now}</td><td>${pct(o.now, total)}</td></tr>`).join('')}</table></div>
-    <p class="sum-note">確認できている家：その家電を今持っていると確かめた家（店クラウドVで廃棄日付に確認日が入っている、または地図の「確認・変更」や「新しく見つけた家電」で記録した）。処分・譲渡と記録したものは数えません。増えた：確認日が${fmt(OWN_SINCE)}より後の家（Vは確認日を1つしか持たないので、前にも確認していた家を確かめ直した分も入ります）。上の期間の選び方には関係しません。</p>`;
+    <div class="sumwrap"><table class="sumt"><tr><th>家電</th><th>増えた<small>${fmt(OWN_SINCE)}から</small></th><th>確認済み<small>今（軒）</small></th><th>お客様<small>の%</small></th></tr>${[...own].map(([cat, o]) => `<tr><th>${esc(catName(cat))}</th><td>${o.since}</td><td class="b">${o.now}</td><td>${pct(o.now, total)}</td></tr>`).join('')}</table></div>
+    <p class="sum-note">確認済み：その家電を今持っているとわかっている家（自店で販売した、店クラウドVで廃棄日付に確認日が入っている、または地図の「確認・変更」や「新しく見つけた家電」で記録した）。処分・譲渡と記録したものは数えません。増えた：確認日か自店の納品日が${fmt(OWN_SINCE)}より後の家（Vは確認日を1つしか持たないので、前にも確認していた家を確かめ直した分も入ります）。上の期間の選び方には関係しません。</p>`;
   // 2) 販売（自店の納品）と、接点があった人・なかった人の買った割合
   const sales = salesIn(R.from, R.to);
   const byCat = new Map(); for (const s of sales) byCat.set(s.cat, (byCat.get(s.cat) || 0) + 1);
