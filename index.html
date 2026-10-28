@@ -801,6 +801,8 @@ details.more .row{margin-top:6px}
 /* お店誌の●の中の季節の字（春夏秋冬）と、前の号を渡してまだ日が浅い人の点線の輪 */
 .lb-pin.cs{display:flex;align-items:center;justify-content:center}
 .lb-pin.cs b{font-size:12px;line-height:1;font-weight:900;font-family:"Hiragino Sans","BIZ UDPGothic",sans-serif}
+.lb-pin.big{left:-16px;top:-16px;width:32px;height:32px;border-width:2.5px}.lb-pin.big b{font-size:20px}
+.lb-early.big{left:-23px;top:-23px;width:46px;height:46px}
 .lb-early{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2.5px dashed #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000;pointer-events:none}
 .catline{font-size:12px;color:var(--muted);margin-top:4px}.catline.early{color:#b45309;font-weight:700}
 /* 顧客コードの右: これまでの購入金額の順位と金額（円マークなし） */
@@ -1936,12 +1938,14 @@ const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 const CAT_WIDE_ZOOM = 13;
 const catLetters = wide => !wide || map.getZoom() >= CAT_WIDE_ZOOM;
 function catalogPin(c, wide) {
-  const early = catTooSoon(c) ? '<span class="lb-early"></span>' : '';
+  // 広域で季節の字を出すときは●を★より大きく（小さい地図でも字が読めるように）。点線の輪も合わせる
+  const big = wide && catLetters(wide) && c.catalog ? ' big' : '';
+  const early = catTooSoon(c) ? `<span class="lb-early${big}"></span>` : '';
   if (c.catalog) {
     // ●は今の号のお店誌を渡した人。季節が分からない（前の版で読んで端末に残っているデータなど）ときは今の季節
     const season = c.catSeason || CATALOG.current;
     const col = staffColor(c.catalog), s = catLetters(wide) && season ? `<b style="color:${inkOn(col)}">${esc(season)}</b>` : '';
-    return early + `<span class="lb-pin${s ? ' cs' : ''}" style="--c:${col}">${s}</span>`;
+    return early + `<span class="lb-pin${s ? ' cs' + big : ''}" style="--c:${col}">${s}</span>`;
   }
   if (c.catalogTarget) return early + STAR;   // on the お店誌 list (RFM A) but not sent yet
   return early;                               // not a お店誌 target: no mark
