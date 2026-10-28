@@ -803,6 +803,8 @@ details.more .row{margin-top:6px}
 .lb-pin.cs b{font-size:12px;line-height:1;font-weight:900;font-family:"Hiragino Sans","BIZ UDPGothic",sans-serif}
 .lb-pin.big{left:-13px;top:-13px;width:26px;height:26px}.lb-pin.big b{font-size:17px}
 .lb-early.big{left:-20px;top:-20px;width:40px;height:40px}
+.lb-pin.bigm{left:-11px;top:-11px;width:22px;height:22px}.lb-pin.bigm b{font-size:15px}
+.lb-early.bigm{left:-17.5px;top:-17.5px;width:35px;height:35px}
 .lb-early{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2.5px dashed #fff;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000;pointer-events:none}
 .catline{font-size:12px;color:var(--muted);margin-top:4px}.catline.early{color:#b45309;font-weight:700}
 /* 顧客コードの右: これまでの購入金額の順位と金額（円マークなし） */
@@ -1938,8 +1940,8 @@ const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 const CAT_WIDE_ZOOM = 13;
 const catLetters = wide => !wide || map.getZoom() >= CAT_WIDE_ZOOM;
 function catalogPin(c, wide) {
-  // 季節の字を出すときは●を★より少しだけ大きく（字が読めるように。広域・中域・詳細とも同じ割合）。点線の輪も合わせる
-  const big = catLetters(wide) && c.catalog ? ' big' : '';
+  // 季節の字を出すときは●を大きめに：広域は★より少し大きく、中域・詳細は★とほぼ同じ（字が読めるように）。点線の輪も合わせる
+  const big = catLetters(wide) && c.catalog ? (wide ? ' big' : ' bigm') : '';
   const early = catTooSoon(c) ? `<span class="lb-early${big}"></span>` : '';
   if (c.catalog) {
     // ●は今の号のお店誌を渡した人。季節が分からない（前の版で読んで端末に残っているデータなど）ときは今の季節
