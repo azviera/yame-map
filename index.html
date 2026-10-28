@@ -1752,11 +1752,11 @@ const BASES = {
 };
 // Google Maps (browser key, restricted to the GitHub Pages address in Google Cloud), loaded only when picked
 const GOOGLE_KEY = location.hostname === 'azviera.github.io' ? 'AIzaSyCEFVYAQvX_6na8z1S1IcYF4UkxF83F-fM' : '';
-const GBASES = { gmap: ['roadmap', 'Googleマップ'], gsat: ['hybrid', 'Google航空写真'] };
+const GBASES = { gmap: ['roadmap', 'デフォルト'], gsat: ['hybrid', '航空写真'] };
 // only the two Google maps are offered; copies that cannot use the key (PC file, Web版) quietly show 地理院の淡色地図
 if (GOOGLE_KEY) for (const k in GBASES) $('#baseSel').insertAdjacentHTML('beforeend', `<option value="${k}">${GBASES[k][1]}</option>`);
 else $('#baseSel').hidden = true;
-const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Googleマップを読み込めませんでした')); document.head.appendChild(s); });
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('地図を読み込めませんでした')); document.head.appendChild(s); });
 let googleReady = null;
 const loadGoogle = () => googleReady ||= (async () => {
   if (!(window.google && google.maps)) await loadScript(`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_KEY}&language=ja&region=JP&v=weekly`);
