@@ -2493,7 +2493,7 @@ const odReady = () => OD.client && OD.tenant && location.origin + location.pathn
 // only the owner (matched by account hash) gets the data buttons; everyone else signs in and just sees the latest map.
 // This only shapes the screen: what anyone can read is decided by their OneDrive sharing.
 const OWNER_HASH = 3959182474;
-const backFromLogin = /[?&](code|error)=/.test(location.search);
+let backFromLogin = /[?&](code|error)=/.test(location.search);   // サインインから戻ってきた読み込みの間だけ true（終わったら false に戻して、自動の読み込みを再開）
 let role = null;
 try { role = JSON.parse(localStorage.getItem('yame-role') || 'null'); } catch {}
 const viewerMode = () => odReady() && role !== 'owner';
@@ -2999,10 +2999,16 @@ async function recPoll() {
   clearTimeout(recPollT); recPollT = null;
   if (document.visibilityState !== 'visible') return;
   recPollT = setTimeout(recPoll, REC_POLL);
-  if (recPolling || !odReady() || !navigator.onLine || !lsGet('yame-od-tok') || !customers.size || isSample) return;
+  if (recPolling || !odReady() || !navigator.onLine || !customers.size || isSample) return;
   recPolling = true;
   try {
-    const t = await odToken(); if (!t) return;   // never sends anyone to the sign-in page from here
+    const t = lsGet('yame-od-tok') ? await odToken() : null;
+    if (!t) {   // サインインの期限切れ: 知らせを出し、しばらく触っていなければ画面を出さずに入り直す
+      if (!odSignedOut && lsGet('yame-od-user')) { odSignedOut = true; renderSrcMods(); }
+      if (Date.now() - lastTouch > 180000) await odSilentRelogin();
+      return;
+    }
+    if (odSignedOut) { odSignedOut = false; renderSrcMods(); }
     if (!odFolderRef) await odFolderChildren(t);
     const it = await graph(`${recBase()}?$select=size,lastModifiedDateTime`, t);
     const sig = `${it.size}|${it.lastModifiedDateTime}`;
@@ -3313,15 +3319,31 @@ $('#odBtn').addEventListener('click', () => {
   }
   odShowList();
 });
+// サインインの期限（Microsoftの決まりで約1日）が切れたとき、画面を出さずに入り直す（10分に1回まで）。
+// ページが一瞬読み直されるので、地図の位置と拡大は覚えておいて戻す
+async function odSilentRelogin() {
+  if (!odReady() || !lsGet('yame-od-user') || !$('#recForm').hidden) return false;
+  if (Date.now() - (lsGet('yame-silent-at') || 0) < 600000) return false;
+  lsSet('yame-silent-at', Date.now()); lsSet('yame-od-pending', 'silent');
+  const c = map.getCenter(); lsSet('yame-resume-view', { lat: c.lat, lng: c.lng, z: map.getZoom(), at: Date.now() });
+  await odLogin({ silent: true });
+  return true;
+}
+// PCで開きっぱなしのとき: 期限が切れたら、しばらく触っていない（3分）ときだけ自動で入り直す。使っている最中は邪魔しない
+let lastTouch = Date.now();
+for (const ev of ['pointerdown', 'keydown', 'wheel']) addEventListener(ev, () => { lastTouch = Date.now(); }, { passive: true, capture: true });
+(() => {
+  const v = lsGet('yame-resume-view'); if (!v) return;
+  lsSet('yame-resume-view', null);
+  if (Date.now() - v.at < 300000) setTimeout(() => map.setView([v.lat, v.lng], v.z, { animate: false }), 1500);
+})();
 // 開いたときにサインインの期限（Microsoftの決まりで約1日）が切れていたら、画面を出さずに自動で入り直す。
 // Microsoft側にサインインが残っていれば、一瞬ページが読み直されるだけで済む（アカウントを選ぶ必要なし）。10分に1回まで
 (async () => {
   const q = new URLSearchParams(location.search);
-  if (q.has('code') || q.has('error') || !odReady() || !lsGet('yame-od-user') || !lsGet('yame-od-tok')) return;
+  if (q.has('code') || q.has('error') || !odReady() || !lsGet('yame-od-user')) return;
   if (await odToken()) return;   // まだ使える
-  if (Date.now() - (lsGet('yame-silent-at') || 0) < 600000) return;
-  lsSet('yame-silent-at', Date.now()); lsSet('yame-od-pending', 'silent');
-  await odLogin({ silent: true });
+  await odSilentRelogin();
 })();// back from the Microsoft sign-in page
 (async () => {
   const q = new URLSearchParams(location.search);
@@ -3345,6 +3367,7 @@ $('#odBtn').addEventListener('click', () => {
     }
     else odViewerLoad(false);
   } catch (e) { toast(e.message, 8000); }
+  finally { backFromLogin = false; if (role === 'owner') { newerAt = 0; setTimeout(checkNewerNow, 3000); } }
 })();
 // PC: hide / show the left panel to give the map the whole width
 /* ---------- 活動集計: 期間ごとの訪問・お店誌・チラシ・推進・見込み・所有確認の軒数と、自店の納品（販売）、キャンペーンの種まきの進み具合 ----------
