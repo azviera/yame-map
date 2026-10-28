@@ -1741,6 +1741,7 @@ function makeSample() {
 // a finger tap often slides a few pixels; Leaflet treats more than 3px as a drag and drops the tap
 L.Draggable.mergeOptions({ clickTolerance: L.Browser.mobile ? 12 : 4 });
 const map = L.map('map', { minZoom: 5, maxZoom: 22, zoomControl: false, preferCanvas: true, attributionControl: true }).setView([STORE.lat, STORE.lng], 14);
+map.attributionControl.setPrefix(false);   // 右下の「Leaflet」は出さない（地図の提供元の表示は残す）
 const renderer = L.canvas({ tolerance: L.Browser.mobile ? 16 : 8 });   // wider tap margin for fingers
 let tileFailed = false;
 const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>';
