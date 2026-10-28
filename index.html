@@ -2043,7 +2043,7 @@ function renderLabels() {
     if (++n > (full ? 800 : 3000)) break;
     L.marker([c.lat, c.lng], { icon: L.divIcon({ className: 'lab-wrap' + (todayOn && !todayCodes.has(c.code) ? ' dim' : ''), html: labelHTML(c, flags, !full), iconSize: [0, 0] }),
       zIndexOffset: selected === c.code ? 2000 : c.rank === 'S' ? 500 : 0, keyboard: false })
-      .on('click', ev => { L.DomEvent.stopPropagation(ev); if (!full) return wideTap(map.mouseEventToContainerPoint(ev.originalEvent)); select(pickLabel(ev.originalEvent, c.code), false); }).addTo(labelLayer);
+      .on('click', ev => { L.DomEvent.stopPropagation(ev); if (tipMode()) return wideTap(map.mouseEventToContainerPoint(ev.originalEvent)); select(pickLabel(ev.originalEvent, c.code), false); }).addTo(labelLayer);
   }
 }
 // houses close together overlap, and the opened one is drawn on top; tapping it again opens the one underneath
@@ -2187,7 +2187,7 @@ function rebuild(fit) {
   for (const c of customers.values()) {
     if (c.lat == null) continue;
     const m = L.circleMarker([c.lat, c.lng], styleFor(c));
-    m.on('click', e => zoneOf() === 'wide' ? wideTap(e.containerPoint) : select(c.code, false));
+    m.on('click', e => tipMode() ? wideTap(e.containerPoint) : select(c.code, false));
     if (!L.Browser.mobile) m.bindTooltip(esc(c.name || c.code), { direction: 'top', offset: [0, -6] });
     markers.set(c.code, m);
   }
@@ -2199,6 +2199,8 @@ function rebuild(fit) {
 // 吹き出しを押すと今までどおり詳細カード。別の所を押す・地図を動かすと消える
 const WIDE_HIT = 20;
 let nameTip = null;
+// 名前の字が地図に出ていない表示（広域、または中域・詳細で「名」を選んでいないとき）は、押すとまず名前の吹き出し
+const tipMode = () => zoneOf() === 'wide' || !zoneSet(zoneOf()).has('name');
 function wideTap(pt) {
   let best = null, bd = WIDE_HIT * WIDE_HIT;
   for (const c of customers.values()) {
@@ -2219,7 +2221,7 @@ function showNameTip(c) {
   L.DomEvent.disableClickPropagation(el);
   L.DomEvent.on(el, 'click', () => { hideNameTip(); select(c.code, true); });
 }
-map.on('click', e => { if (zoneOf() === 'wide') wideTap(e.containerPoint); else hideNameTip(); });
+map.on('click', e => { if (tipMode()) wideTap(e.containerPoint); else hideNameTip(); });
 map.on('movestart zoomstart', hideNameTip);
 function refresh() {
   let shown = 0;
