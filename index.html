@@ -1938,8 +1938,8 @@ const rankMark = c => glyph(esc(c.rfm), DIMS.rfm.colors[c.rfm] || '#fff', 'k');
 const CAT_WIDE_ZOOM = 13;
 const catLetters = wide => !wide || map.getZoom() >= CAT_WIDE_ZOOM;
 function catalogPin(c, wide) {
-  // 広域で季節の字を出すときは●を★より少しだけ大きく（小さい地図でも字が読めるように）。点線の輪も合わせる
-  const big = wide && catLetters(wide) && c.catalog ? ' big' : '';
+  // 季節の字を出すときは●を★より少しだけ大きく（字が読めるように。広域・中域・詳細とも同じ割合）。点線の輪も合わせる
+  const big = catLetters(wide) && c.catalog ? ' big' : '';
   const early = catTooSoon(c) ? `<span class="lb-early${big}"></span>` : '';
   if (c.catalog) {
     // ●は今の号のお店誌を渡した人。季節が分からない（前の版で読んで端末に残っているデータなど）ときは今の季節
@@ -2111,10 +2111,10 @@ function renderLogoToggles() {
     row([1, 2, 3].map(n => glyph(stageMark(n), st('ト'), 'w dg')).join(''), `接点 ${CP_KINDS.map(stageLabel).join('・')}（色は担当）`) +
     row(glyph('訪', st('タ'), 'w') + glyph('来', st(STORE_STAFF), 'w'), '訪問（色は担当）・来＝店頭販売（ミ）');
 }
-// dots and 広域 icons shrink as the map zooms out; 中域 icons are the usual size, 詳細 (houses far apart on screen) a quarter bigger
+// dots and 広域 icons shrink as the map zooms out; 中域 icons are a little bigger than the largest 広域 ones, 詳細 about the same as 中域
 const dotScale = () => { const z = map.getZoom(); return z >= DOT_FULL_ZOOM ? 0.65 : Math.max(0.3, 0.65 - (DOT_FULL_ZOOM - z) * 0.08); };
 // 広域でお店誌の印（季節の字入り）を出すときは、字が読める大きさより小さくしない
-const iconScale = () => { const z = zoneOf(); return z === 'wide' ? (catalogShown() && map.getZoom() >= CAT_WIDE_ZOOM ? Math.max(dotScale(), 0.6) : dotScale()) : z === 'mid' ? 0.65 : 0.8125; };
+const iconScale = () => { const z = zoneOf(); return z === 'wide' ? (catalogShown() && map.getZoom() >= CAT_WIDE_ZOOM ? Math.max(dotScale(), 0.6) : dotScale()) : z === 'mid' ? 0.8 : 0.8125; };
 // 現在地ボタンの中の丸: 詳細＝大きい・中域＝中くらい・広域＝小さい（ピンチで変えたときも）
 const applyIconScale = () => { $('#map').style.setProperty('--s', iconScale()); $('#meZoneDot').setAttribute('r', { wide: 3, mid: 5, near: 7.5 }[zoneOf()]); };
 applyIconScale();
