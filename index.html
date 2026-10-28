@@ -1009,6 +1009,7 @@ details.more .row{margin-top:6px}
     </div>
     <div class="sec">
       <h2>地図に出すロゴ</h2>
+      <div class="row" style="margin-bottom:8px"><button class="btn" id="recommendBtn" type="button">おすすめの表示にする（お店誌・アイコン全部）</button></div>
       <div class="widesel"><span>広域で出すアイコン</span>
         <button type="button" class="iconpick" id="widePick"></button></div>
       <div class="widesel"><span>中域で出すアイコン</span>
@@ -1906,7 +1907,7 @@ const storeMarker = L.marker([STORE.lat, STORE.lng], { zIndexOffset: 1000, title
   icon: L.divIcon({ className: 'store-icon', html: '店', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(map)
   .on('click', () => toast('お店（店頭販売の来店客は最近接点者「ミ」として色分け・絞り込みできます）', 4500));
 
-let dim = 'rfm';   // ピンの色分け: RFM by default, the last choice is remembered
+let dim = 'catalog';   // ピンの色分け: お店誌 by default (おすすめの表示), the last choice is remembered
 try { const d = localStorage.getItem('yame-dim'); if (d && DIMS[d]) dim = d; } catch {}
 // 絞り込みは端末ごとに覚えて、アプリを最新にしても残す。初めてと、「すべて表示」のあと開き直したときは
 // いつもの絞り込み（顧客ランクS・未設定を外す）から始める
@@ -2016,7 +2017,7 @@ try {
 // 中域: 最初は今までの「近く（詳細）」と同じ選び方
 let midSet;
 try { const m2 = JSON.parse(localStorage.getItem('yame-mid') || 'null'); if (Array.isArray(m2)) midSet = new Set(m2.filter(k => LOGO_KEYS.includes(k))); } catch {}
-midSet ||= new Set(LOGO_KEYS.filter(k => show[k]));
+midSet ||= new Set(LOGO_KEYS);   // 初めての端末は「おすすめの表示」と同じく全部
 const zoneSet = zone => zone === 'wide' ? wideSet : zone === 'mid' ? midSet : new Set(LOGO_KEYS.filter(k => show[k]));
 // お店誌の印を出すとき（下のバーで「お店誌」、またはその区分で「お店誌」を選んだとき）は、広域でも9段階より寄っていればアイコン表示に
 const catalogShown = () => dim === 'catalog' || zoneSet(zoneOf()).has('catalog');
@@ -2087,6 +2088,19 @@ function openPick(which) {
   $('#pickSheet').hidden = false;
 }
 const readPick = () => new Set([...$('#psList').querySelectorAll('input[data-pk]')].filter(i => i.checked).map(i => i.dataset.pk));
+// おすすめの表示: 下の欄とピンの色＝お店誌、広域は印（★・黄◯・担当色●）だけ、中域・詳細はアイコン全部、絞り込み＝顧客ランクS・未設定を外す。
+// 押したこの端末の表示だけをそろえる（ほかの人の端末は変えない）
+function applyRecommended() {
+  dim = 'catalog'; try { localStorage.setItem('yame-dim', dim); } catch {}
+  wideSet = new Set(); midSet = new Set(LOGO_KEYS);
+  for (const k of LOGO_KEYS) show[k] = true;
+  try { localStorage.setItem('yame-wide2', '[]'); localStorage.setItem('yame-mid', JSON.stringify(LOGO_KEYS)); localStorage.setItem('yame-logos2', JSON.stringify(show)); } catch {}
+  for (const k in hidden) hidden[k] = new Set();
+  hidden.rank = new Set(['S', '未設定']); filtersOff = false;
+  renderPicks(); refresh(); if (selected) select(selected, false);
+  toast('おすすめの表示にしました', 3000);
+}
+$('#recommendBtn').addEventListener('click', applyRecommended);
 const pickAll = on => { for (const i of $('#psList').querySelectorAll('input[data-pk]')) i.checked = on; savePick(pickWhich, readPick()); };
 $('#psList').addEventListener('change', () => savePick(pickWhich, readPick()));
 $('#psAll').addEventListener('click', () => pickAll(true));
