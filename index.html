@@ -665,8 +665,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* 季節のボタン: 字の下に、その季節をこのお客様に最後に配った年。今の号を配り済みなら色付き＋✓ */
 .catrow .btn.season{display:inline-flex;flex-direction:column;align-items:center;line-height:1.1;padding:4px 8px;min-width:44px}
 .catrow .btn.season small{font-size:10px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;min-height:11px}
-.catrow .btn.season.given{background:#e3f6ec;border-color:#2e9e62}
+.catrow .btn.season.given{background:#e3f6ec;border-color:#2e9e62;color:#14532d}
 .catrow .btn.season.given small{color:#1f7a49;font-weight:700}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .catrow .btn.season.given{background:#1f4a33;border-color:#3fbf7a;color:#e9fff2}
+:root:not([data-theme="light"]) .catrow .btn.season.given small{color:#8fe3b4}}
+:root[data-theme="dark"] .catrow .btn.season.given{background:#1f4a33;border-color:#3fbf7a;color:#e9fff2}
+:root[data-theme="dark"] .catrow .btn.season.given small{color:#8fe3b4}
 #recForm .acts{display:flex;gap:8px;justify-content:flex-end}
 #recForm .applOnly[hidden],#recForm .exOnly[hidden],#recForm .yearOnly[hidden],#recForm .dlvOnly[hidden]{display:none}
 #recForm .exOnly{display:flex;flex-direction:column;gap:6px}
