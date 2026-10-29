@@ -768,6 +768,38 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
 #todayBox[hidden]{display:none}
 #todayBox button{border:none;border-radius:10px;padding:2px 8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer}
+/* 巡回リスト: 地図の左上に開く一覧と、地図の番号の札 */
+#routeBtn{display:inline-flex;align-items:center;gap:3px;padding-inline:8px}
+#routeBtn b{font-variant-numeric:tabular-nums}
+#routeBtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#routeBox{position:absolute;top:12px;left:12px;z-index:860;width:380px;max-width:calc(100% - 24px);max-height:calc(100% - 90px);overflow:auto;padding:10px 12px 12px;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);font-size:13px}
+#routeBox[hidden]{display:none}
+#routeBox .rhd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+#routeBox .rhd b{font-size:15px}
+#routeBox .x{border:none;background:none;color:var(--ink);font-size:22px;line-height:1;cursor:pointer;padding:0 4px}
+#routeBox .racts,#routeBox .rlegs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+#routeBox .racts .btn{height:32px;font-size:12px;padding:0 10px}
+#routeBox .rlegs a{display:inline-flex;align-items:center;text-decoration:none;height:36px}
+#routeBox .rlegs small,#routeBox .rempty{color:var(--muted);font-size:12px;line-height:1.5}
+#routeBox .rlist{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:4px}
+#routeBox .rlist li{display:flex;align-items:center;gap:6px;padding:5px 4px;border-bottom:1px solid var(--line)}
+#routeBox .rlist li.seen{opacity:.55}
+#routeBox .no{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:12px}
+#routeBox li.seen .no{background:#0b6e4f;color:#fff}
+#routeBox .who{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:none;background:none;color:var(--ink);text-align:left;padding:0;cursor:pointer;font:inherit}
+#routeBox .who b{font-size:14px}
+#routeBox .who small{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#routeBox .ops{flex:none;display:flex;gap:2px}
+#routeBox .ops button{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);cursor:pointer;font-size:14px}
+#routeBox .ops button:disabled{opacity:.3;cursor:default}
+#routeBox .rfoot{text-align:right}
+#routeBox .rfoot button{border:none;background:none;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px}
+.route-mark b{position:absolute;left:-11px;top:-30px;min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border-radius:11px;display:grid;place-items:center;
+  background:#0e6a87;color:#fff;font-size:12px;font-weight:700;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.4);pointer-events:none}
+.route-mark.done b{background:#0b6e4f}
+#card .links .rtgl{height:auto;padding:2px 10px;font-size:13px}
+#card .links .rtgl.in{background:var(--accent-soft);border-color:var(--accent)}
 details.more summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:4px 0}
 details.more[open] summary{margin-bottom:8px}
 details.more .row{margin-top:6px}
@@ -1044,7 +1076,9 @@ details.more .row{margin-top:6px}
     <div class="mapbtns">
       <select class="btn" id="baseSel" aria-label="地図の種類"></select>
       <button class="btn mebtn" id="meBtn" type="button" aria-label="現在地" title="現在地"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#cfe3fb"/><circle id="meZoneDot" cx="12" cy="12" r="5" fill="#1a73e8"/></svg></button>
+      <button class="btn" id="routeBtn" type="button" title="巡回リスト：今日回る家を選んで並べ、Googleマップの道順にします"><span aria-hidden="true">🚩</span><span class="tx">巡回</span><b id="routeN"></b></button>
     </div>
+    <section id="routeBox" hidden aria-label="巡回リスト"></section>
     <div id="legend" aria-label="凡例（タップで表示・非表示）"></div>
     <div id="filterBar" hidden></div>
     <div id="todayBox" hidden></div>
@@ -2242,7 +2276,7 @@ function refresh() {
   $('#shown').textContent = shown.toLocaleString();
   $('#total').textContent = customers.size.toLocaleString();
   $('#openPanel').textContent = $('#panel').classList.contains('open') ? 'メニューを閉じる' : 'メニュー';
-  renderLegend(); renderFilters(); renderFilterBar(); renderList();
+  renderLegend(); renderFilters(); renderFilterBar(); renderList(); renderRoute();
 }
 function fitAll() {
   const pts = [...customers.values()].filter(c => c.lat != null && passes(c)).map(c => [c.lat, c.lng]);
@@ -2402,7 +2436,8 @@ function select(code, pan, stay) {   // stay: redraw the open card without movin
     <div class="bd">
       <div class="blk"><h3>住所</h3><div class="addr">${esc(c.addr || '住所なし')}</div>${c.tels && c.tels.size ? `<div class="empty">電話 ${[...c.tels].map(t => `<a href="tel:${esc(t)}">${esc(t)}</a>`).join('・')}</div>` : ''}${c.addr2 ? `<div class="empty">${esc(c.addr2)}</div>` : ''}
         <div class="links"><a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで見る</a>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a></div></div>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${q}" target="_blank" rel="noopener">ここへの道順</a>
+        <button type="button" class="btn rtgl${inRoute(c.code) ? ' in' : ''}" data-route="1">${inRoute(c.code) ? `巡回リスト ${routeCodes.indexOf(c.code) + 1}番目 ✓（外す）` : '🚩 巡回リストに入れる'}</button></div></div>
       <div class="blk recblk"><h3>記録をつける</h3>
         <div class="row catrow"><span class="lt">お店誌</span>${(() => { const yrs = catYears(c); return CATALOG.seasons.map(s => {
           const given = s === CATALOG.current && c.catalog;   // 今の号はもう渡した
@@ -2463,6 +2498,7 @@ function applyCardMode() {
 function emptyScreen(forAge) {
   customers = new Map(); rHidden = new Map(); sources = []; srcMods = {}; jsonSrc = {}; savedAt = null; isSample = false;
   recFiles = {}; if (!forAge) recPending = [];
+  routeCodes = []; routeSig = '';
   selected = null; $('#card').hidden = true; hideNameTip();
   rebuild(false); renderRecState();
   toast(forAge ? `${wipeDays()}日以上開いていなかったため、この端末のデータを消しました。「最新のお客様データを表示」（またはOneDriveから最新を読み込む）でサインインし直すと元に戻ります` : 'この端末のデータを消しました。「最新のお客様データを表示」（またはOneDriveから最新を読み込む）でサインインし直すと元に戻ります', 9000);
@@ -2620,7 +2656,7 @@ const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localSt
    表示の好み（下の欄・アイコン・絞り込み）は残す。keepPending: まだ送れていない記録は残す（サインインし直したら送る） */
 const WIPE_DAYS = 14;   // 既定。地図の設定.json の "端末のデータを消す日数" で変えられ、端末は前回読んだ値を覚えておく
 function wipeDevice(keepPending) {
-  for (const k of ['yame-rec-files', 'yame-od-tok', 'yame-od-user', 'yame-silent-at', 'yame-od-pending']) lsSet(k, null);
+  for (const k of ['yame-route', 'yame-rec-files', 'yame-od-tok', 'yame-od-user', 'yame-silent-at', 'yame-od-pending']) lsSet(k, null);
   if (!keepPending) lsSet('yame-rec-pending', null);
   lsSet('yame-wiped', true);   // サインインし直すまで見本データも出さない
   return clearData();
@@ -2935,6 +2971,119 @@ $('#todayBox').addEventListener('click', e => {
   const st = e.target.dataset.todayStaff; if (st == null) return;
   const pts = [...todayCodes].filter(([, rs]) => rs.some(r => r.staff === st)).map(([code]) => customers.get(code)).filter(c => c && c.lat != null).map(c => [c.lat, c.lng]);
   if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.3), { maxZoom: ME_STAGE.near + STAGE0 });
+});
+/* ---------- 巡回リスト: 今日回る家を選んで並べ、Googleマップの道順にまとめて渡す ----------
+   この端末だけに覚える（顧客コードだけ。この端末のデータを消すと一緒に消える）。地図には番号の札を出す */
+const ROUTE_LEG = 10;     // Googleマップの1本の道順に入れる軒数（行き先1軒＋途中9軒がGoogleマップの上限）
+const ROUTE_ADD_MAX = 30; // 「見えている家を入れる」で一度に入れる上限
+let routeCodes = lsGet('yame-route') || [];
+let routeOpen = false, routeSig = '';
+const routeLayer = L.layerGroup().addTo(map);
+const saveRoute = () => { lsSet('yame-route', routeCodes.length ? routeCodes : null); routeSig = ''; renderRoute(); };
+const inRoute = code => routeCodes.includes(code);
+function routeToggle(code) {
+  routeCodes = inRoute(code) ? routeCodes.filter(x => x !== code) : routeCodes.concat(code);
+  saveRoute();
+  if (selected === code) select(code, false, true);
+}
+// 最後の接点（店クラウドVの接点・訪問と、この地図の記録）から何日か
+function lastContactDays(c) {
+  let last = 0;
+  for (const e of [...c.events, ...c.visits]) if (e.date && +e.date > last) last = +e.date;
+  return last ? daysSince(isoDay(new Date(last))) : null;
+}
+const routeDoneToday = () => {
+  const t = isoDay(new Date()), s = new Set();
+  for (const r of computeRecords().recs.values()) if (r.date === t) s.add(r.code);
+  return s;
+};
+const distKm = (a, b) => map.distance([a.lat, a.lng], [b.lat, b.lng]) / 1000;
+// 近い順: 今いる所（現在地を出していなければお店）から、いちばん近い家へ、次はそこから近い家へ…
+function routeSortNear() {
+  const start = meDot ? { lat: meDot.getLatLng().lat, lng: meDot.getLatLng().lng } : STORE;
+  const rest = routeCodes.map(k => customers.get(k)).filter(c => c && c.lat != null);
+  const noPos = routeCodes.filter(k => !rest.some(c => c.code === k));
+  const out = []; let at = start;
+  while (rest.length) {
+    let bi = 0; rest.forEach((c, i) => { if (distKm(at, c) < distKm(at, rest[bi])) bi = i; });
+    at = rest.splice(bi, 1)[0]; out.push(at.code);
+  }
+  routeCodes = out.concat(noPos); saveRoute();
+  toast(meDot ? '今いる所から近い順に並べました' : 'お店から近い順に並べました（現在地を出すと、今いる所から並べます）');
+}
+function routeAddVisible() {
+  const b = map.getBounds();
+  const add = [...customers.values()].filter(c => c.lat != null && passes(c) && b.contains([c.lat, c.lng]) && !inRoute(c.code));
+  if (!add.length) { toast('画面に見えている家は、もう全部入っています'); return; }
+  if (add.length > ROUTE_ADD_MAX) { toast(`画面に${add.length}軒あります。${ROUTE_ADD_MAX}軒以下になるまで拡大するか、絞り込んでから入れてください`, 5000); return; }
+  routeCodes = routeCodes.concat(add.map(c => c.code)); saveRoute();
+  toast(`${add.length}軒を入れました`);
+}
+// Googleマップの道順: 10軒ずつ（2本目からは前の最後の家から出発）。出発地を入れないと今いる所から
+function routeLegs() {
+  const done = routeDoneToday();
+  const pts = routeCodes.map(k => customers.get(k)).filter(c => c && !done.has(c.code));
+  const at = c => c.lat != null ? `${c.lat},${c.lng}` : c.addr;
+  const legs = [];
+  for (let i = 0; i < pts.length; i += ROUTE_LEG) {
+    const leg = pts.slice(i, i + ROUTE_LEG), from = i ? pts[i - 1] : null, last = leg[leg.length - 1];
+    const p = new URLSearchParams({ api: '1', travelmode: 'driving', destination: at(last) });
+    if (from) p.set('origin', at(from));
+    if (leg.length > 1) p.set('waypoints', leg.slice(0, -1).map(at).join('|'));
+    legs.push({ from: i + 1, to: i + leg.length, url: 'https://www.google.com/maps/dir/?' + p });
+  }
+  return legs;
+}
+function renderRoute() {
+  const done = routeDoneToday();
+  const sig = [routeOpen, routeCodes.join(','), [...done].filter(inRoute).join(','), customers.size].join('|');
+  $('#routeN').textContent = routeCodes.length ? ` ${routeCodes.length}` : '';
+  $('#routeBtn').classList.toggle('on', routeOpen);
+  if (sig === routeSig) return;
+  routeSig = sig;
+  routeLayer.clearLayers();
+  routeCodes.forEach((k, i) => {
+    const c = customers.get(k); if (!c || c.lat == null) return;
+    L.marker([c.lat, c.lng], { interactive: false, keyboard: false, zIndexOffset: 2400,
+      icon: L.divIcon({ className: 'route-mark' + (done.has(k) ? ' done' : ''), html: `<b>${done.has(k) ? '✓' : i + 1}</b>`, iconSize: [0, 0] }) }).addTo(routeLayer);
+  });
+  const box = $('#routeBox'); box.hidden = !routeOpen;
+  if (!routeOpen) return;
+  const n = routeCodes.length, left = routeCodes.filter(k => !done.has(k)).length;
+  const rows = routeCodes.map((k, i) => {
+    const c = customers.get(k);
+    if (!c) return `<li class="gone"><span class="no">${i + 1}</span><span class="who"><b>（今のデータにいないお客様）</b><small>${esc(k)}</small></span><span class="ops"><button type="button" data-rdrop="${esc(k)}" aria-label="外す">×</button></span></li>`;
+    const d = lastContactDays(c), seen = done.has(k);
+    const sub = [c.rfm ? 'RFM ' + c.rfm : '', d == null ? '接点なし' : `最後の接点 ${d}日前`, seen ? '今日記録あり' : ''].filter(Boolean).join('・');
+    return `<li class="${seen ? 'seen' : ''}"><span class="no">${seen ? '✓' : i + 1}</span>
+      <button type="button" class="who" data-rgo="${esc(k)}"><b>${esc(c.name || '（名称なし）')}</b><small>${esc(sub)}</small><small>${esc(c.addr || '')}</small></button>
+      <span class="ops"><button type="button" data-rmove="${esc(k)}|-1" aria-label="上へ"${i ? '' : ' disabled'}>↑</button><button type="button" data-rmove="${esc(k)}|1" aria-label="下へ"${i < n - 1 ? '' : ' disabled'}>↓</button><button type="button" data-rdrop="${esc(k)}" aria-label="外す">×</button></span></li>`;
+  }).join('');
+  const legs = left ? routeLegs() : [];
+  box.innerHTML = `<div class="rhd"><b>巡回リスト ${n}軒${n && left < n ? `（残り${left}軒）` : ''}</b><button type="button" class="x" id="routeClose" aria-label="閉じる">×</button></div>
+    <div class="racts"><button class="btn" type="button" id="routeAddVis">画面に見えている家を入れる</button>${n > 1 ? '<button class="btn" type="button" id="routeSort">近い順に並べる</button>' : ''}</div>
+    ${n ? `<ol class="rlist">${rows}</ol>` : '<div class="rempty">お客様の詳細の「巡回リストに入れる」か、上のボタンで入れます。絞り込み（RFM・所有年数・接点段階など）で家をしぼってから「画面に見えている家を入れる」と早いです。</div>'}
+    ${legs.length ? `<div class="rlegs">${legs.map(l => `<a class="btn primary" href="${esc(l.url)}" target="_blank" rel="noopener">Googleマップで道順${legs.length > 1 ? `（${l.from}〜${l.to}軒目）` : ''}</a>`).join('')}
+      <small>記録をつけた家（✓）は道順から外します。途中の家が多いときは、Googleマップのアプリで開いてください（ブラウザだと途中の家が少なくなることがあります）。</small></div>` : ''}
+    ${n ? '<div class="rfoot"><button type="button" id="routeClear">全部外す</button></div>' : ''}`;
+}
+$('#routeBtn').addEventListener('click', () => { routeOpen = !routeOpen; renderRoute(); });
+$('#routeBox').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'routeClose') { routeOpen = false; renderRoute(); }
+  else if (b.id === 'routeAddVis') routeAddVisible();
+  else if (b.id === 'routeSort') routeSortNear();
+  else if (b.id === 'routeClear') { if (confirm('巡回リストを全部外しますか？')) { routeCodes = []; saveRoute(); } }
+  else if (b.dataset.rdrop) { routeCodes = routeCodes.filter(x => x !== b.dataset.rdrop); saveRoute(); }
+  else if (b.dataset.rmove) {
+    const [k, d] = b.dataset.rmove.split('|'), i = routeCodes.indexOf(k), j = i + +d;
+    if (i < 0 || j < 0 || j >= routeCodes.length) return;
+    [routeCodes[i], routeCodes[j]] = [routeCodes[j], routeCodes[i]]; saveRoute();
+  }
+  else if (b.dataset.rgo) {
+    if (matchMedia('(max-width:860px)').matches) { routeOpen = false; renderRoute(); }   // スマホは詳細と重なるので閉じる（🚩でまた開く）
+    select(b.dataset.rgo, true);
+  }
 });
 function recListHTML(code) {
   const { recs, done } = computeRecords();
@@ -3276,7 +3425,8 @@ $('#recForm form').addEventListener('submit', e => {
   toast(recHold(rec) ? '記録しました。製造年が空なので保留になります。わかったら直してください' : '記録しました', recHold(rec) ? 6000 : 2000);
 });
 $('#card').addEventListener('click', e => {
-  const b = e.target.closest('[data-rec],[data-redit],[data-rdel],[data-acheck],[data-aunits]'); if (!b || !selected) return;
+  const b = e.target.closest('[data-rec],[data-redit],[data-rdel],[data-acheck],[data-aunits],[data-route]'); if (!b || !selected) return;
+  if (b.dataset.route) { routeToggle(selected); return; }
   if (b.dataset.acheck) {
     const [cat, i] = b.dataset.acheck.split('|'), cu = customers.get(selected);
     const a = i != null && i !== '-1' ? cu.appl[cat][+i] : currentAppliance(cu, cat);
