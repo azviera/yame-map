@@ -1030,6 +1030,8 @@ details.more .row{margin-top:6px}
       <summary>その他</summary>
       <div class="recstate">記録を書き出す（CSV）は、自動入力が使えないときに手で入力するためと、確かめるためのものです。</div>
       <div class="row"><button class="btn" id="recExport" type="button">記録を書き出す（CSV）</button></div>
+      <div class="recstate">スマホをなくしたときなどに、この端末に残っているお客様データとサインインを消します（表示の設定は残ります）。</div>
+      <div class="row"><button class="btn" id="wipeBtn" type="button">この端末のデータを消す</button></div>
       <div id="recExportBox" hidden class="recstate">
         <label><input type="checkbox" id="recOnlyNew" checked> 店クラウドVに未入力の分だけ</label>
         <div class="row"><button class="btn primary" id="recExportGo" type="button">書き出す</button><button class="btn" id="recMarkDone" type="button" disabled>書き出した分を「入力済み」にする</button></div>
@@ -1664,6 +1666,8 @@ async function checkNewerNow() {
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') { hiddenAt = Date.now(); return; }
+  if (tooLongAway()) { wipeDevice(true).then(() => emptyScreen(true)); lsSet('yame-last-open', Date.now()); return; }
+  lsSet('yame-last-open', Date.now());
   if (hiddenAt && Date.now() - hiddenAt > 300000) lastTouch = 0;
   checkNewerNow();
 });
@@ -2454,7 +2458,16 @@ function applyCardMode() {
     if (cardMode === 'mid') setTimeout(() => { if (cardMode === 'mid') { el.classList.remove('sized', 'snap'); el.style.height = ''; } }, 240);
   };
   el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
-})();function closeCard() { selected = null; $('#card').hidden = true; refresh(); }
+})();
+// 消したあとの画面: お客様のいない地図（見本も出さない）。サインインし直せば元に戻る
+function emptyScreen(forAge) {
+  customers = new Map(); rHidden = new Map(); sources = []; srcMods = {}; jsonSrc = {}; savedAt = null; isSample = false;
+  recFiles = {}; if (!forAge) recPending = [];
+  selected = null; $('#card').hidden = true; hideNameTip();
+  rebuild(false); renderRecState();
+  toast(forAge ? `${wipeDays()}日以上開いていなかったため、この端末のデータを消しました。「最新のお客様データを表示」（またはOneDriveから最新を読み込む）でサインインし直すと元に戻ります` : 'この端末のデータを消しました。「最新のお客様データを表示」（またはOneDriveから最新を読み込む）でサインインし直すと元に戻ります', 9000);
+}
+function closeCard() { selected = null; $('#card').hidden = true; refresh(); }
 
 /* ---------- events ---------- */
 let toastT;
@@ -2603,7 +2616,21 @@ async function odViewerLoad(auto) {
 $('#viewBtn').addEventListener('click', () => odViewerLoad(false));
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
 const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+/* ---------- 端末をなくしたとき用: この端末に残っているお客様データ・記録の控え・サインインを消す ----------
+   表示の好み（下の欄・アイコン・絞り込み）は残す。keepPending: まだ送れていない記録は残す（サインインし直したら送る） */
+const WIPE_DAYS = 14;   // 既定。地図の設定.json の "端末のデータを消す日数" で変えられ、端末は前回読んだ値を覚えておく
+function wipeDevice(keepPending) {
+  for (const k of ['yame-rec-files', 'yame-od-tok', 'yame-od-user', 'yame-silent-at', 'yame-od-pending']) lsSet(k, null);
+  if (!keepPending) lsSet('yame-rec-pending', null);
+  lsSet('yame-wiped', true);   // サインインし直すまで見本データも出さない
+  return clearData();
+}
+// 最後に開いてから決めた日数より空いていたら、データを地図に出す前に消す（開いた時と、画面に戻った時に確かめる）
+const wipeDays = () => lsGet('yame-wipe-days') || WIPE_DAYS;
+const tooLongAway = () => { const t = lsGet('yame-last-open'); return !!t && Date.now() - t > wipeDays() * 864e5; };
+const wipedForAge = tooLongAway();
+const wipeDone = wipedForAge ? wipeDevice(true) : Promise.resolve();
+lsSet('yame-last-open', Date.now());const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const odAuthBase = () => `https://login.microsoftonline.com/${OD.tenant}/oauth2/v2.0`;
 async function odLogin(opts = {}) {   // opts.silent: 画面を出さずに（Microsoftに残っているサインインで）入り直す
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
@@ -2630,7 +2657,7 @@ async function odTokenRequest(params) {
   if (!r.ok) throw new Error(j.error_description || j.error || 'サインインに失敗しました');
   const tok = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 120) * 1000, scope: j.scope || '' };
   if (j.id_token) { try { const pl = JSON.parse(decodeURIComponent(escape(atob(j.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); if (pl.preferred_username) lsSet('yame-od-user', pl.preferred_username); } catch {} }
-  lsSet('yame-od-tok', tok);
+  lsSet('yame-od-tok', tok); lsSet('yame-wiped', null);
   return tok;
 }
 async function odToken() {   // a usable access token, or null when a fresh sign-in is needed
@@ -2667,6 +2694,7 @@ async function odReadSettings(list) {
     applyCampaignSettings(s['キャンペーン']);
     applyStageNames(s['接点の名前']);
     if (/^\d{4}-\d{2}-\d{2}$/.test(s['所有確認の基準日'] || '')) OWN_SINCE = s['所有確認の基準日'];
+    if (+s['端末のデータを消す日数'] > 0) lsSet('yame-wipe-days', +s['端末のデータを消す日数']);
   } catch {}
 }
 let odSettings = {};   // 地図の設定.json の中身（保存するときにほかの項目を消さないため）
@@ -3260,6 +3288,13 @@ $('#card').addEventListener('click', e => {
   else if (b.dataset.rdel && confirm('この記録を消しますか？')) recAdd({ op: 'del', recId: b.dataset.rdel });
 });
 
+// この端末のデータを消す（なくしたとき用）。まだ送れていない記録があれば件数を出して強めに注意する
+$('#wipeBtn').addEventListener('click', async () => {
+  const n = recPending.length;
+  const msg = 'この端末に残っているお客様データ・記録の控え・サインインを消します。' + (n ? `\n\n【注意】まだ送れていない記録が ${n} 件あります。消すとこの記録はなくなります。` : '') + '\n\n消したあとは「最新のお客様データを表示」でサインインし直すと元に戻ります。消しますか？';
+  if (!confirm(msg)) return;
+  await wipeDevice(false); emptyScreen(false);
+});
 // CSV for entering into 店クラウドV (Excel opens it as is)
 $('#recExport').addEventListener('click', () => { $('#recExportBox').hidden = !$('#recExportBox').hidden; });
 $('#recExportGo').addEventListener('click', () => {
@@ -3739,9 +3774,10 @@ new MutationObserver(refresh).observe(document.documentElement, { attributes: tr
 
 makeSample();
 applyRole();
-if (viewerMode()) { customers = new Map(); sources = []; isSample = false; }   // people I share with see real data or nothing, never the sample
+if (viewerMode() || lsGet('yame-wiped')) { customers = new Map(); sources = []; isSample = false; }   // people I share with see real data or nothing, never the sample
 rebuild(true);
-loadData().then(d => {
+wipeDone.then(loadData).then(d => {
+  if (wipedForAge) emptyScreen(true);
   if (d && d.customers instanceof Map && d.customers.size && (isSample || !customers.size)) {
     customers = d.customers; sources = d.sources || []; srcMods = d.srcMods || {}; jsonSrc = d.jsonSrc || {}; savedAt = d.savedAt || null; isSample = false;
     applyRecords(); rebuild(true); recLoad(); renderSrcMods();
